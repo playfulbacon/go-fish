@@ -61,7 +61,7 @@ export class GameView {
     this.selectedTarget = null;
     this.selectedRank = null;
     this.handIds = new Set();
-    this.booksShown = players.map(() => 0);
+    this.booksShown = players.map(() => []);
 
     this.el.results.classList.add('hidden');
     this.el.reveal.replaceChildren();
@@ -102,6 +102,7 @@ export class GameView {
   #present(events) {
     let beat = 0;
     let lastLine = null;
+    let gameOver = false;
 
     for (const event of events) {
       this.memory.observe(event);
@@ -116,8 +117,12 @@ export class GameView {
       }
       const line = this.#lineFor(event);
       if (line) lastLine = line;
-      if (event.type === 'gameover') this.#after(700, () => this.#showResults());
+      if (event.type === 'gameover') gameOver = true;
     }
+
+    // Wait for the last bubble of the final move -- usually the winning book --
+    // before the results card wipes the table.
+    if (gameOver) this.#after(Math.max(700, beat * BEAT.bubble + 500), () => this.#showResults());
 
     this.#render();
     const player = this.game.current;
@@ -256,16 +261,26 @@ export class GameView {
     }
   }
 
-  /** Only append chips for newly made books, so the pop animation fires once. */
+  /**
+   * Redraw a player's book chips, popping only the ranks that are new.
+   * Compares by rank rather than by count: books are kept in rank order, so a
+   * new book can land anywhere in the list and shift everything after it.
+   */
   #renderBooks(container, player) {
     const shown = this.booksShown[player.index];
-    for (let i = shown; i < player.books.length; i++) {
+    const books = player.books;
+    if (shown.length === books.length && shown.every((rank, i) => rank === books[i])) return;
+
+    const had = new Set(shown);
+    const frag = document.createDocumentFragment();
+    for (const rank of books) {
       const chip = document.createElement('span');
-      chip.className = 'book-chip';
-      chip.textContent = player.books[i];
-      container.append(chip);
+      chip.className = `book-chip${had.has(rank) ? '' : ' is-new'}`;
+      chip.textContent = rank;
+      frag.append(chip);
     }
-    this.booksShown[player.index] = player.books.length;
+    container.replaceChildren(frag);
+    this.booksShown[player.index] = books.slice();
   }
 
   #buildPile() {
@@ -456,6 +471,10 @@ export class GameView {
   }
 
   #showResults() {
+    // Anything still mid-flight belongs to the game that just ended.
+    this.#clearBubbles();
+    this.el.reveal.replaceChildren();
+
     const game = this.game;
     const ranked = game.players.slice().sort((a, b) => b.books.length - a.books.length);
     const humanWon = game.winners.includes(game.human.index);

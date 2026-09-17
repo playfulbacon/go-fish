@@ -360,8 +360,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   border-radius: 4px;
   background: var(--accent-soft);
   color: var(--accent);
-  animation: pop .32s ease;
 }
+.book-chip.is-new { animation: pop .32s ease; }
 @media (prefers-color-scheme: dark) { .book-chip { color: var(--ink); } }
 
 @keyframes pop {
