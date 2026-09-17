@@ -18,9 +18,9 @@ python3 -m http.server 8000
 
 Either option serves the site from the repository root:
 
-- **GitHub Actions** (what `.github/workflows/pages.yml` does): in
-  **Settings → Pages**, set **Source** to **GitHub Actions**. Every push to
-  `main` deploys.
+- **GitHub Actions** (what `.github/workflows/pages.yml` does): nothing to set
+  up. The workflow enables Pages itself on its first run, and every push to
+  `main` deploys from there.
 - **Branch**: in **Settings → Pages**, set **Source** to **Deploy from a
   branch**, and pick `main` / `/ (root)`.
 
