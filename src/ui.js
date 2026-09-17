@@ -169,10 +169,13 @@ export class GameView {
     switch (event.type) {
       case 'ask':
         return `${who(event.player)} ${you(event.player) ? 'ask' : 'asks'} ${who(event.target)} for <b>${rankPlural(event.rank)}</b>.`;
-      case 'gofish':
+      case 'gofish': {
+        // The target may be the player themselves when a computer asks them.
+        const says = you(event.player) ? 'say' : 'says';
         return you(event.asker)
-          ? `${who(event.player)} says go fish — tap the pond.`
-          : `${who(event.player)} says go fish.`;
+          ? `${who(event.player)} ${says} go fish — tap the pond.`
+          : `${who(event.player)} ${says} go fish.`;
+      }
       case 'give': {
         const cards = `${event.count} <b>${event.count === 1 ? rankSingular(event.rank) : rankPlural(event.rank)}</b>`;
         return `${who(event.from)} ${you(event.from) ? 'hand over' : 'hands over'} ${cards}.`;
@@ -409,9 +412,10 @@ export class GameView {
     const player = this.game.players[playerIndex];
     // Anchor above the status line (not the hand) so the player's own bubble
     // never lands on the text telling them what just happened.
+    // Below the whole opponent block, so the bubble clears their book chips.
     const anchor = player.isHuman
       ? this.el.status
-      : this.opponentEls.get(playerIndex)?.button.querySelector('.avatar');
+      : this.opponentEls.get(playerIndex)?.button;
     if (!anchor) return;
 
     const box = anchor.getBoundingClientRect();
