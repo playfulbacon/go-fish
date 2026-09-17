@@ -22,10 +22,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      # Requires Pages to be enabled once by hand, with Settings -> Pages ->
+      # Source set to "GitHub Actions". The workflow token is not allowed to
+      # turn Pages on itself.
       - uses: actions/configure-pages@v5
-        with:
-          # Turn Pages on the first time this runs, so no manual setup is needed.
-          enablement: true
       - name: Assemble site
         # Publish the repository as-is, minus the things that are not the site.
         run: |

@@ -16,13 +16,19 @@ python3 -m http.server 8000
 
 ## Deploy to GitHub Pages
 
-Either option serves the site from the repository root:
+Pages has to be switched on once by hand either way — a workflow's token is
+not allowed to do it. Pick one option in **Settings → Pages**:
 
-- **GitHub Actions** (what `.github/workflows/pages.yml` does): nothing to set
-  up. The workflow enables Pages itself on its first run, and every push to
-  `main` deploys from there.
-- **Branch**: in **Settings → Pages**, set **Source** to **Deploy from a
-  branch**, and pick `main` / `/ (root)`.
+- **GitHub Actions** — set **Source** to **GitHub Actions**. The included
+  `.github/workflows/pages.yml` then deploys on every push to `main`. Re-run
+  the latest workflow once after switching, since runs before Pages existed
+  will have failed.
+- **Deploy from a branch** — set **Source** to **Deploy from a branch** and
+  pick `main` / `/ (root)`. This needs no workflow at all; the site is plain
+  static files at the repository root. If you go this way you can delete
+  `.github/workflows/pages.yml`.
+
+Either way the site lands at `https://playfulbacon.github.io/go-fish/`.
 
 ## How it plays
 
