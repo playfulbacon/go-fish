@@ -274,13 +274,16 @@ export class GameView {
       // Golden-angle scatter: evenly messy, and identical every time so the
       // pile does not reshuffle itself visually on each render.
       const angle = i * 2.39996;
-      const radius = 4 + i * 2.6;
+      // Measured in card widths, not pixels, so the pile keeps its shape when
+      // the cards scale down on short screens instead of spilling out.
+      const radius = 0.07 + i * 0.038;
       const x = Math.cos(angle) * radius;
       const y = Math.sin(angle) * radius;
       const tilt = ((i * 53) % 74) - 37;
       const card = document.createElement('span');
       card.className = 'pile-card';
-      card.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) rotate(${tilt}deg)`;
+      card.style.transform =
+        `translate(calc(var(--card-w) * ${x.toFixed(3)}), calc(var(--card-w) * ${y.toFixed(3)})) rotate(${tilt}deg)`;
       frag.append(card);
     }
     this.el.pondCards.replaceChildren(frag);

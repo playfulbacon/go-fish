@@ -279,8 +279,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .opponent {
   position: relative;
-  flex: none;
-  width: clamp(72px, 21vw, 96px);
+  /* Share the row evenly so a full table of five still fits on a phone
+     instead of scrolling the last player off the edge. */
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: clamp(72px, 21vw, 96px);
   border: 0;
   background: none;
   padding: 8px 2px 10px;
@@ -380,8 +383,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .pond {
   position: relative;
-  width: min(68vw, 240px);
-  height: min(68vw, 240px);
+  /* Never taller than the table area it sits in, so short screens shrink the
+     pond instead of pushing it over the status line. */
+  height: min(68vw, 240px, 100%);
+  aspect-ratio: 1 / 1;
+  width: auto;
+  max-width: 100%;
   border: 0;
   background: none;
   padding: 0;
@@ -749,9 +756,24 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
 }
 
-/* Short viewports (landscape phones): trim the table so the hand survives. */
+/* Short viewports (landscape phones): scale the whole table down so the hand
+   still fits on screen instead of being pushed off the bottom. */
 @media (max-height: 560px) {
-  .table { min-height: 92px; }
-  .pond { width: min(34vh, 150px); height: min(34vh, 150px); }
-  .status { min-height: 2em; padding: 4px 20px 6px; }
+  :root { --card-w: clamp(36px, 10.5vh, 54px); }
+  .topbar { padding: 4px 10px 0; }
+  .icon-btn { width: 32px; height: 32px; font-size: 15px; }
+  .turn-pill { padding: 4px; font-size: 11px; }
+  .opponents { padding: 2px 8px 0; }
+  .opponent { max-width: clamp(64px, 18vw, 88px); padding: 4px 2px 6px; }
+  .avatar { width: 36px; height: 36px; font-size: 15px; }
+  .avatar-count { min-width: 17px; height: 17px; font-size: 10px; }
+  .opponent-name { font-size: 11px; }
+  .table { min-height: 70px; }
+  .pond { height: min(30vh, 132px, 100%); }
+  .pond-count { min-width: 34px; padding: 3px 8px; font-size: 12px; }
+  .pond-tap { font-size: 11px; padding: 4px 10px; }
+  .status { min-height: 1.5em; padding: 2px 16px 4px; font-size: 13px; }
+  .hand-area { padding-top: 4px; border-radius: 14px 14px 0 0; }
+  .hand-head { padding: 0 14px 4px; }
+  .hand { padding: 10px 12px 4px; min-height: calc(var(--card-w) * 1.4 + 14px); }
 }
