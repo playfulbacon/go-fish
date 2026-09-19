@@ -212,7 +212,8 @@ export class GameView {
           ? `${who(event.player)} fished exactly what they asked for — they go again.`
           : `${who(event.player)} fishes a card.`;
       case 'book':
-        return `${who(event.player)} ${you(event.player) ? 'complete' : 'completes'} a book of <b>${rankPlural(event.rank)}</b>.`;
+        return `${who(event.player)} ${you(event.player) ? 'complete' : 'completes'}`
+          + ` a ${this.#setWord()} of <b>${rankPlural(event.rank)}</b>.`;
       case 'pond-empty':
         return 'The pond is empty.';
       case 'skip':
@@ -222,6 +223,12 @@ export class GameView {
       default:
         return null;
     }
+  }
+
+  /** What this variant calls a completed set: a book, a pair, whatever. */
+  #setWord(count = 1) {
+    const label = this.game.rules.setLabel || { one: 'book', many: 'books' };
+    return count === 1 ? label.one : label.many;
   }
 
   #promptText() {
@@ -594,7 +601,7 @@ export class GameView {
       row.innerHTML = `
         <span class="dot" style="background:${player.color}">${player.name.charAt(0)}</span>
         <span class="who">${player.name}</span>
-        <span class="n">${player.books.length} <small>book${player.books.length === 1 ? '' : 's'}</small></span>`;
+        <span class="n">${player.books.length} <small>${this.#setWord(player.books.length)}</small></span>`;
       frag.append(row);
     }
     this.el.scoreboard.replaceChildren(frag);

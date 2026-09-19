@@ -2,6 +2,7 @@ import { GameView } from './ui.js';
 import { VARIANTS } from './rules/index.js';
 import { CastView } from './cast/ui.js';
 import { castAndBoat } from './cast/rules.js';
+import { CAST_TUNABLES, tunedRules } from './cast/tuning.js';
 
 /**
  * Every playable version, in the order the title screen lists them.
@@ -37,10 +38,14 @@ const castGame = {
   minAi: 1,
   maxAi: 5,
   defaultAi: 3,
-  setupHint: (total) =>
-    `${total} players, ${castAndBoat.handSize} cards each, first to ${castAndBoat.targetScore(total)}.`,
+  /** Every number this game balances on can be set from the title screen. */
+  tunables: CAST_TUNABLES,
+  setupHint: (total, tuning) => {
+    const rules = tunedRules(tuning, total);
+    return `${total} players, ${rules.handSize} cards each, first to ${rules.targetScore(total)}.`;
+  },
   createView: () => new CastView(),
-  start: (view, aiCount) => view.start(castAndBoat, aiCount),
+  start: (view, aiCount, tuning) => view.start(tunedRules(tuning, aiCount + 1), aiCount),
 };
 
 export const GAMES = [...goFishGames, castGame];

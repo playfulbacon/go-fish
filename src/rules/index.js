@@ -1,12 +1,13 @@
 import { classic } from './classic.js';
 import { tidePool } from './tidepool.js';
+import { pairs } from './pairs.js';
 
 /**
  * Every playable rule variant, in the order they appear on the title screen.
  * Variants never reach into each other; a game is played entirely through the
  * single variant object selected here.
  */
-export const VARIANTS = [classic, tidePool];
+export const VARIANTS = [classic, pairs, tidePool];
 
 export const DEFAULT_VARIANT = classic.id;
 

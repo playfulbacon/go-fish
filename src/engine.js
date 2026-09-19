@@ -257,12 +257,34 @@ export class Game {
     return this.pond.splice(index, 1)[0];
   }
 
+  /**
+   * Lay down every complete set the player holds.
+   *
+   * Takes exactly `bookSize` cards per set rather than every card of the rank,
+   * which matters as soon as a variant scores sets smaller than four: holding
+   * three of a rank with pairs is one pair and a spare, not one pair and a
+   * destroyed card. Cards come out of the hand before the face-up one, so a
+   * player keeps what they are showing where it is not needed.
+   */
   #claimBooks(player, silent = false) {
-    const counts = countByRank(this.holdings(player));
-    for (const rank of Object.keys(counts)) {
-      if (counts[rank] < this.rules.bookSize) continue;
-      player.hand = player.hand.filter((c) => c.rank !== rank);
-      if (player.showing && player.showing.rank === rank) player.showing = null;
+    const size = this.rules.bookSize;
+    for (;;) {
+      const counts = countByRank(this.holdings(player));
+      const rank = Object.keys(counts).find((r) => counts[r] >= size);
+      if (rank === undefined) return;
+
+      let owed = size;
+      const kept = [];
+      for (const card of player.hand) {
+        if (card.rank === rank && owed > 0) { owed -= 1; continue; }
+        kept.push(card);
+      }
+      player.hand = kept;
+      if (owed > 0 && player.showing && player.showing.rank === rank) {
+        player.showing = null;
+        owed -= 1;
+      }
+
       player.books.push(rank);
       player.books.sort((a, b) => rankOrder(a) - rankOrder(b));
       if (!silent) this.#emit({ type: 'book', player: player.index, rank });

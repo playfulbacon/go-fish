@@ -21,7 +21,7 @@
         <span class="mini-card red">Q<i>&diams;</i></span>
       </div>
       <h1>Go Fish</h1>
-      <p class="brand-sub">Ask, fish, collect books of four.</p>
+      <p class="brand-sub">Four small card games.</p>
     </header>
 
     <div class="setup">
@@ -42,8 +42,13 @@
       </div>
 
       <button type="button" class="primary" id="start-btn">Start game</button>
-      <button type="button" class="link" id="title-rules-btn">How to play</button>
+      <div class="title-links">
+        <button type="button" class="link" id="title-rules-btn">How to play</button>
+        <button type="button" class="link hidden" id="tune-btn">Tune the rules</button>
+      </div>
     </div>
+
+    <p class="version" id="version"></p>
   </div>
 </section>
 
@@ -118,6 +123,17 @@
     <h2 id="sheet-title">How to play</h2>
     <div class="sheet-body" id="sheet-body"></div>
     <button type="button" class="primary" id="sheet-close">Got it</button>
+  </div>
+</div>
+
+<div class="sheet-backdrop hidden" id="tune-backdrop">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="tune-title">
+    <div class="sheet-grab" aria-hidden="true"></div>
+    <h2 id="tune-title">Tune the rules</h2>
+    <p class="field-hint" id="tune-note"></p>
+    <div class="tune-list" id="tune-list"></div>
+    <button type="button" class="link" id="tune-reset">Reset to defaults</button>
+    <button type="button" class="primary" id="tune-close">Done</button>
   </div>
 </div>
 

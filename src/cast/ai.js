@@ -64,6 +64,7 @@ function completesFor(boat, card, rules) {
 export function chooseCast(game, player, rng = Math.random) {
   const { rules } = game;
   const dump = leastUseful(player.hand, player.boat, rules);
+  if (!dump) return null;   // nothing to cast
 
   // Calling forces everyone holding the named rank or suit to hand one over,
   // so it is worth paying for when the boat wants more of something specific.
@@ -202,6 +203,7 @@ export function autoPlay(game, rng = Math.random) {
         if (swap && swap.gain >= 3) return game.swapBoats(swap.a, swap.b);
       }
       const move = chooseCast(game, player, rng);
+      if (!move) return null;
       return game.cast(move.cardId, { call: move.call });
     }
     case 'respond':

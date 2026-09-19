@@ -1273,3 +1273,81 @@ button.pool-card.live:active { transform: scale(.94); }
   .pool { gap: 4px; }
   .showing-slot { min-height: calc(var(--card-w) * .3 * 1.4); }
 }
+
+/* ============================================================ tuning sheet */
+
+.title-links { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+
+.version {
+  margin: 18px 0 0;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.tune-list { display: flex; flex-direction: column; gap: 2px; }
+
+.tune-group {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding: 14px 2px 4px;
+}
+.tune-group:first-child { padding-top: 0; }
+
+.tune-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 0;
+}
+
+.tune-label { font-size: 15px; font-weight: 600; min-width: 0; }
+.tune-label small {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+.tune-row.changed .tune-label::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.tune-ctl {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 3px;
+}
+.tune-ctl .step { width: 38px; height: 38px; font-size: 20px; border-radius: 8px; }
+.tune-value {
+  min-width: 32px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tune-warn {
+  display: block;
+  color: var(--card-red);
+  font-weight: 600;
+}
+.tune-warn + .tune-warn { margin-top: 4px; }

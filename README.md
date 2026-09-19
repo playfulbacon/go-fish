@@ -42,6 +42,12 @@ every copy over and you go again; if not, they say *go fish* and you tap the
 pond to draw. Four of a kind is a book. When all thirteen books are made, the
 most books wins.
 
+### Go Fish: Pairs
+
+The same game with two of a rank scoring instead of four. Sets land constantly,
+so a game takes a few minutes and asking is far less of a commitment. Twenty-six
+pairs in the deck; the biggest pile wins.
+
 ### Go Fish: Tide Pool
 
 Go Fish in clear water. Four cards lie **face up in a pool**, and when told to
@@ -94,6 +100,14 @@ Luck buys three special actions, all at the same price:
 Everyone refills to five and the next player casts. First to the target score
 wins.
 
+**Every number is tunable.** "Tune the rules" on the title screen opens a sheet
+for the target score, all four set values, the three luck costs, luck per match
+and its cap, hand size, boat size and how many answers reach the table. Changes
+are saved, apply to the next game, and reset in one tap. The sheet warns about
+settings that will not play — all four set values at zero means nobody can ever
+win — and every field was simulated at both ends of its range to make sure no
+setting crashes or freezes the game.
+
 #### Rules that were filled in
 
 The game was specified in prose, so these were decided to make it playable and
@@ -109,9 +123,9 @@ are all tunable in one place, `src/cast/rules.js`:
 - **Scoring.** Run 3, flush 3, three of a kind 5, straight flush 8, paying only
   the best match. A run is three consecutive ranks in any suits; aces run low
   (A-2-3) or high (Q-K-A) but do not wrap.
-- **Target score** scales with the table — 12/12/14/18/22 for 2–6 players —
+- **Target score** scales with the table — 8/8/9/11/13 for 2–6 players —
   because more players means more answers, so boats land more often. Tuned by
-  simulation so every table runs about the same length in total turns (49–57),
+  simulation so every table runs about the same length in total turns (30–37),
   which is what a player actually sits through, since you act on every turn
   whether you are casting or answering.
 - **Luck** is 1 per matching answer, capped at 6, and every action costs 2. The
@@ -150,6 +164,9 @@ playable exactly as they were.
     src/ai.js  src/ui.js  Go Fish computer players and table
     src/cast/             Cast & Boat: rules, engine, ai, ui
 
+`src/version.js` holds the version shown on the title screen; bump it whenever
+something ships.
+
 **A Go Fish rule tweak** is a new file in `src/rules/` added to the array in
 `src/rules/index.js`. The Go Fish engine is driven entirely by the variant it
 is handed and hard-codes no rule, so it needs no changes, and each variant
@@ -168,6 +185,9 @@ engine: it adds a face-up pool and a face-up card per player purely through
 `poolSize` and `showingCard`, which the engine treats as off for any variant
 that does not set them. Classic's behaviour is identical before and after,
 checked by simulating 2000 games of it against the same move counts.
+
+A variant that scores something other than four of a kind should set
+`setLabel` so the game stops calling it a book, as Pairs does.
 
 A Go Fish variant is a plain object:
 

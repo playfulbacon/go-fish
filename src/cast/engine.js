@@ -7,11 +7,15 @@ export const SET_LABELS = {
   run: 'Run',
 };
 
-/** Three consecutive ranks. Aces run either low (A-2-3) or high (Q-K-A). */
+/**
+ * Consecutive ranks. Aces run either low (A-2-3) or high (Q-K-A).
+ * Works for any boat size, since boat size is tunable.
+ */
 export function isRun(orders) {
   const consecutive = (values) => {
     const sorted = [...values].sort((a, b) => a - b);
-    return sorted[1] === sorted[0] + 1 && sorted[2] === sorted[1] + 1;
+    if (sorted.length < 3) return false;
+    return sorted.every((v, i) => i === 0 || v === sorted[i - 1] + 1);
   };
   if (consecutive(orders)) return true;
   const ace = rankOrder('A');
@@ -281,7 +285,7 @@ export class CastGame {
   #deal() {
     for (const player of this.players) this.#refill(player);
     this.#emit({ type: 'deal' });
-    this.#emit({ type: 'turn', player: this.caster, round: this.round });
+    this.#startCast();
   }
 
   #reveal() {
@@ -366,8 +370,25 @@ export class CastGame {
 
     this.caster = (this.caster + 1) % this.players.length;
     if (this.caster === 0) this.round += 1;
-    this.phase = 'cast';
-    this.#emit({ type: 'turn', player: this.caster, round: this.round });
+    this.#startCast();
+  }
+
+  /**
+   * Hand the cast to the next player who can actually make one. Normally that
+   * is whoever is next, but a table can run out of cards -- a hand size the
+   * deck cannot sustain, say -- and nobody can cast from an empty hand.
+   */
+  #startCast() {
+    for (let step = 0; step < this.players.length; step++) {
+      if (this.players[this.caster].hand.length > 0) {
+        this.phase = 'cast';
+        this.#emit({ type: 'turn', player: this.caster, round: this.round });
+        return;
+      }
+      this.#emit({ type: 'skip', player: this.caster });
+      this.caster = (this.caster + 1) % this.players.length;
+    }
+    this.#endGame();   // every hand is empty and the deck is spent
   }
 
   #refill(player) {

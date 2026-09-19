@@ -26,9 +26,10 @@ export const castAndBoat = {
   /**
    * Winning score, by number of players. A bigger table puts more answers in
    * front of the caster, so boats land more often and the target rises to keep
-   * every game about the same length. Tuned by simulation to 13-25 casts each.
+   * every game about the same length: about 30-37 turns all in, which is
+   * roughly a third shorter than it used to be. Tune it from the title screen.
    */
-  targetScore: (playerCount) => ({ 2: 12, 3: 12, 4: 14, 5: 18, 6: 22 }[playerCount] ?? 14),
+  targetScore: (playerCount) => ({ 2: 8, 3: 8, 4: 9, 5: 11, 6: 13 }[playerCount] ?? 9),
 
   /** Luck earned by a responder whose card matches the cast card. */
   luckPerMatch: 1,
