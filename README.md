@@ -30,32 +30,88 @@ not allowed to do it. Pick one option in **Settings → Pages**:
 
 Either way the site lands at `https://playfulbacon.github.io/go-fish/`.
 
-## How it plays
+## The games
 
-Pick how many computer players you want on the title screen and start. On your
-turn, tap a player and then tap a card in your hand to ask them for that rank
-(tapping in the other order works too). If they have it they hand every copy
-over and you go again; if not, they say *go fish* and you tap the pond to draw.
-Four of a kind is a book. When all thirteen books are made, the most books
-wins.
+Pick a game and the number of computer players on the title screen.
 
-## Rule variants
+### Go Fish
 
-The whole point of the layout is that the rules live apart from the game.
+On your turn, tap a player and then tap a card in your hand to ask them for
+that rank (tapping in the other order works too). If they have it they hand
+every copy over and you go again; if not, they say *go fish* and you tap the
+pond to draw. Four of a kind is a book. When all thirteen books are made, the
+most books wins.
 
-- `src/rules/` — one file per variant, plus `index.js` listing them.
-- `src/engine.js` — the game, driven entirely by whichever variant it is
-  handed. It reads the variant's settings and never hard-codes a rule.
-- `src/ui.js` — rendering and input; it reads state from the engine.
-- `src/ai.js` — what computer players are allowed to know, rebuilt from the
-  public event log so they cannot see anyone's hand.
+### Cast & Boat
 
-To add a variant, copy `src/rules/classic.js`, change what you want, and add it
-to the array in `src/rules/index.js`. It then shows up as a choice on the title
-screen. Existing variants are never edited, so every version stays playable
-exactly as it was.
+A different game, not a Go Fish variant, with its own engine and table.
 
-A variant is a plain object:
+On your turn you are the **caster**: play one card face up into the pond.
+Everyone else answers with a card face down, and all the answers flip at once.
+Any answer matching your cast card's suit or rank earns that player **luck**.
+You then **boat** one answer — it goes face up in front of you — and the rest
+are discarded. Three cards in your boat scores: three of a rank, three of a
+suit, or a run of three. Then the boat empties, set or not, so the third card
+is the whole gamble.
+
+Spend luck to **call a rank** (everyone holding it must answer with it), to
+**boat a second card**, or to **swap a card** out of your hand. Everyone
+refills to five and the next player casts. First to the target score wins.
+
+#### Rules that were filled in
+
+The game was specified in prose, so these were decided to make it playable and
+are all tunable in one place, `src/cast/rules.js`:
+
+- **The pond answers a short table.** The caster choosing one answer is the
+  whole game, and at two players there is only one answer — no decision at all.
+  Simulated over full games, that left a **1% set rate**, and matches that
+  effectively never ended. So when fewer than `minAnswers` (3) cards reach the
+  table, the pond deals face-down cards to make up the difference. Pond cards
+  earn nobody luck. That took two players to a 34% set rate, in line with three
+  and four. Set `minAnswers: 0` to play it straight.
+- **Scoring.** Run 3, flush 3, three of a kind 5, straight flush 8, paying only
+  the best match. A run is three consecutive ranks in any suits; aces run low
+  (A-2-3) or high (Q-K-A) but do not wrap.
+- **Target score** scales with the table — 12/12/14/18/22 for 2–6 players —
+  because more players means more answers, so boats land more often. Tuned by
+  simulation so every table takes roughly 16–26 casts each.
+- **Luck** is 1 per matching answer, capped at 6. Call costs 3, an extra boat
+  3, a swap 1. The cap matters: uncapped, players sat on 8 of 10 and luck
+  stopped being a decision.
+- **The caster boats from the answers only**, not from their own cast card.
+  Taking your own cast back would be a guaranteed free boat every turn, which
+  removes the reason to cast anything.
+- **A called rank** is the rank of the card you cast, so calling is one tap
+  rather than a separate rank picker.
+
+## Adding versions
+
+Every playable version is listed in `src/games.js`, and the title screen is
+built from that list. Versions never reach into each other, so old ones stay
+playable exactly as they were.
+
+    src/games.js          the menu: every playable version
+    src/cards.js          shared card primitives
+    src/rules/            Go Fish rule variants (one file each)
+    src/engine.js         Go Fish game logic, driven by a variant
+    src/ai.js  src/ui.js  Go Fish computer players and table
+    src/cast/             Cast & Boat: rules, engine, ai, ui
+
+**A Go Fish rule tweak** is a new file in `src/rules/` added to the array in
+`src/rules/index.js`. The Go Fish engine is driven entirely by the variant it
+is handed and hard-codes no rule, so it needs no changes, and each variant
+appears in the menu on its own.
+
+**A different game** gets its own folder, its own `<section class="screen">` in
+`index.html`, and an entry in `src/games.js` providing `createView()` and
+`start(view, aiCount)`. Cast & Boat is the worked example.
+
+Computer players in both games read only from what is public — the event log in
+Go Fish, the cast card and face-up boats in Cast & Boat. Neither ever looks at
+a hand.
+
+A Go Fish variant is a plain object:
 
 ```js
 export const myVariant = {

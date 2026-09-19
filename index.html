@@ -26,8 +26,8 @@
 
     <div class="setup">
       <div class="field">
-        <label class="field-label" for="variant-list">Game</label>
-        <div class="chips" id="variant-list" role="radiogroup" aria-label="Game version"></div>
+        <span class="field-label" id="variant-label">Game</span>
+        <div class="chips" id="variant-list" role="radiogroup" aria-labelledby="variant-label"></div>
         <p class="field-hint" id="variant-hint"></p>
       </div>
 
@@ -73,6 +73,37 @@
       <span class="you-books" id="you-books"></span>
     </div>
     <div class="hand" id="hand"></div>
+  </div>
+</section>
+
+<!-- -------------------------------------------------------- cast&boat -->
+<section class="screen hidden" id="cast-screen">
+  <header class="topbar">
+    <button type="button" class="icon-btn" id="cast-quit" aria-label="Back to menu">&#8592;</button>
+    <div class="turn-pill" id="cast-pill">Your cast</div>
+    <button type="button" class="icon-btn" id="cast-rules" aria-label="How to play">?</button>
+  </header>
+
+  <div class="rivals" id="cast-rivals"></div>
+
+  <div class="pond-table">
+    <div class="cast-slot" id="cast-slot"></div>
+    <div class="answers" id="cast-answers"></div>
+    <div class="pile" id="cast-pile" aria-hidden="true"></div>
+  </div>
+
+  <p class="status" id="cast-status" role="status" aria-live="polite">&nbsp;</p>
+
+  <div class="you-panel">
+    <div class="you-head">
+      <div class="boat" id="cast-boat"></div>
+      <div class="you-meta">
+        <div class="luck" id="cast-luck"></div>
+        <div class="tally" id="cast-score"></div>
+      </div>
+    </div>
+    <div class="actions" id="cast-actions"></div>
+    <div class="hand" id="cast-hand"></div>
   </div>
 </section>
 

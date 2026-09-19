@@ -777,3 +777,380 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .hand-head { padding: 0 14px 4px; }
   .hand { padding: 10px 12px 4px; min-height: calc(var(--card-w) * 1.4 + 14px); }
 }
+
+/* ======================================================= Cast & Boat table */
+
+.rivals {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 6px 8px 2px;
+}
+
+.rival {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: clamp(74px, 22vw, 100px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 2px;
+  border-radius: 14px;
+  transition: background .2s ease;
+}
+.rival.active { background: var(--accent-soft); }
+.rival.active .avatar { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--accent); }
+.rival-name {
+  font-size: 12px;
+  font-weight: 600;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------- the boat */
+.boat { display: flex; gap: 4px; justify-content: center; }
+.boat.mini { gap: 3px; }
+
+.slot {
+  width: calc(var(--card-w) * .82);
+  aspect-ratio: 5 / 7;
+  border: 1.5px dashed var(--line);
+  border-radius: 7px;
+  flex: none;
+}
+.slot.tiny { width: calc(var(--card-w) * .34); border-width: 1px; border-radius: 4px; opacity: .45; }
+
+.boat-card {
+  width: calc(var(--card-w) * .82);
+  margin: 0;
+  flex: none;
+}
+.boat-card.tiny {
+  width: calc(var(--card-w) * .34);
+  border-radius: 4px;
+  gap: 0;
+}
+.boat-card.tiny .r { font-size: calc(var(--card-w) * .18); }
+.boat-card.tiny .s { font-size: calc(var(--card-w) * .15); }
+.boat-card.landed { animation: landed .34s cubic-bezier(.2, .9, .3, 1.2); }
+
+@keyframes landed {
+  0% { transform: translateY(-26px) scale(.8); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* ---------------------------------------------------------------- luck */
+.luck { display: flex; align-items: center; gap: 6px; }
+.luck-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.pips { display: flex; gap: 3px; }
+.luck.mini { gap: 2px; justify-content: center; flex-wrap: wrap; }
+
+.pip {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line);
+  transition: background .25s ease, transform .25s ease;
+}
+.pip.on { background: var(--accent); transform: scale(1.12); }
+.pip.mini { width: 5px; height: 5px; }
+
+/* --------------------------------------------------------------- table */
+.pond-table {
+  position: relative;
+  flex: 1;
+  min-height: 130px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 6px 10px;
+  background: radial-gradient(ellipse at center, var(--bg-table) 0%, var(--bg) 74%);
+}
+
+.cast-slot { display: flex; justify-content: center; }
+.cast-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+
+.cast-card {
+  width: calc(var(--card-w) * 1.28);
+  margin: 0;
+  box-shadow: var(--shadow-md);
+  animation: castIn .36s cubic-bezier(.2, .9, .3, 1.2);
+}
+
+@keyframes castIn {
+  0% { transform: translateY(40px) scale(.7) rotate(-8deg); opacity: 0; }
+  100% { transform: translateY(0) scale(1) rotate(0); opacity: 1; }
+}
+
+.cast-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.cast-empty { width: calc(var(--card-w) * 1.28); }
+
+.answers {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: calc(var(--card-w) * 1.4);
+}
+
+.answer {
+  flex: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  perspective: 600px;
+}
+
+.answer-inner {
+  position: relative;
+  width: calc(var(--card-w) * 1.06);
+  aspect-ratio: 5 / 7;
+  transform-style: preserve-3d;
+  transition: transform .45s cubic-bezier(.3, .8, .3, 1);
+}
+.answer.up .answer-inner { transform: rotateY(180deg); }
+
+.answer .face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  border-radius: 8px;
+  margin: 0;
+  width: 100%;
+}
+.answer .back {
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, .13) 0 4px, transparent 4px 8px),
+    linear-gradient(150deg, var(--back), var(--back-2));
+  border: 1px solid var(--back-2);
+  box-shadow: var(--shadow-sm);
+}
+.answer .front {
+  transform: rotateY(180deg);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--card-black);
+}
+@media (prefers-color-scheme: dark) { .answer .front { color: var(--ink); } }
+.answer .front.red { color: var(--card-red); }
+.answer .front .r { font-size: calc(var(--card-w) * .38); line-height: 1; }
+.answer .front .s { font-size: calc(var(--card-w) * .3); line-height: 1; }
+
+.answer-who {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--ink-faint);
+  max-width: calc(var(--card-w) + 10px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.answer.matched .answer-who { color: var(--accent); }
+.answer.matched.up .front { box-shadow: 0 0 0 2px var(--accent), var(--shadow-sm); }
+
+.answer.takeable .answer-inner { cursor: pointer; }
+.answer.takeable:active .answer-inner { transform: rotateY(180deg) scale(.94); }
+.answer.takeable .front { box-shadow: 0 0 0 2px var(--accent), var(--shadow-md); }
+.answer.takeable { animation: offer 1.6s ease-in-out infinite; }
+
+@keyframes offer {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+/* The draw pile, so the table reads as a pond and the reshuffle makes sense. */
+.pile {
+  position: absolute;
+  right: 12px;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.pile-stack {
+  position: relative;
+  width: calc(var(--card-w) * .44);
+  aspect-ratio: 5 / 7;
+}
+.pile-stack span {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, .13) 0 3px, transparent 3px 6px),
+    linear-gradient(150deg, var(--back), var(--back-2));
+  border: 1px solid var(--back-2);
+}
+.pile-stack span:nth-child(1) { transform: translate(-3px, -3px) rotate(-6deg); opacity: .55; }
+.pile-stack span:nth-child(2) { transform: translate(2px, 1px) rotate(4deg); opacity: .8; }
+.pile-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.pile.low .pile-count { color: var(--card-red); }
+
+/* ------------------------------------------------------------ you panel */
+.you-panel {
+  flex: none;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  border-radius: 20px 20px 0 0;
+  padding: 10px 0 max(10px, env(safe-area-inset-bottom));
+  box-shadow: 0 -6px 24px rgba(20, 24, 30, .07);
+}
+
+.you-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px 8px;
+}
+
+.you-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+
+.tally { display: flex; align-items: baseline; gap: 3px; }
+.tally-n { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.tally-of { font-size: 12px; font-weight: 600; color: var(--ink-faint); }
+
+.actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 12px;
+}
+.actions:empty { display: none; }
+
+.action {
+  border: 1px solid var(--line);
+  background: var(--bg);
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: transform .12s ease, background .15s ease, border-color .15s ease;
+}
+.action i {
+  font-style: normal;
+  font-size: 11px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: inline-grid;
+  place-items: center;
+}
+.action.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.action.on i { background: rgba(255, 255, 255, .25); color: inherit; }
+.action:active { transform: scale(.95); }
+
+.card-btn {
+  border: 0;
+  background: none;
+  padding: 0;
+  display: flex;
+  flex: none;
+}
+.hand .card-btn + .card-btn, .hand .card + .card-btn, .hand .card-btn + .card { margin-left: 5px; }
+.hand.tight .card-btn + .card-btn,
+.hand.tight .card + .card-btn,
+.hand.tight .card-btn + .card { margin-left: calc(var(--card-w) * -.3); }
+.hand .card.dimmed { opacity: .34; }
+.hand.live .card-btn:active .card { transform: translateY(-10px); }
+
+/* ---------------------------------------------------------------- banner */
+/* A compact pill at the top of the table: the caster may still be choosing
+   another answer underneath it, so it must not cover the cards. */
+.banner {
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  z-index: 50;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: calc(100% - 16px);
+  padding: 7px 15px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--bg);
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+  animation: bannerIn .28s cubic-bezier(.2, .9, .3, 1.3) backwards,
+             bannerOut .3s ease forwards .95s;
+}
+.banner.good { background: var(--accent); color: var(--accent-ink); }
+.banner-who { font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; opacity: .75; white-space: nowrap; }
+.banner-title { font-size: 16px; font-weight: 800; letter-spacing: -.01em; white-space: nowrap; }
+.banner-sub { font-size: 13px; font-weight: 700; opacity: .85; white-space: nowrap; }
+
+@keyframes bannerIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(.88); }
+}
+@keyframes bannerOut {
+  to { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(.97); }
+}
+
+/* Short viewports (landscape phones). Cast & Boat stacks more rows than Go
+   Fish -- rivals, table, boat, actions, hand -- so it scales down further. */
+@media (max-height: 560px) {
+  #cast-screen { --card-w: clamp(32px, 9.5vh, 50px); }
+  .rivals { padding: 2px 8px 0; gap: 3px; }
+  .rival { max-width: clamp(64px, 18vw, 88px); padding: 2px 2px 4px; gap: 2px; }
+  .rival .avatar { width: 30px; height: 30px; font-size: 13px; }
+  .rival .avatar-count { min-width: 16px; height: 16px; font-size: 9px; }
+  .rival-name { font-size: 10px; }
+  .pond-table { min-height: 64px; gap: 6px; padding: 2px 8px; }
+  .cast-label { display: none; }
+  .answer-who { font-size: 9px; }
+  .pile { right: 6px; bottom: 2px; }
+  .pile-count { font-size: 11px; }
+  .you-panel { padding-top: 4px; border-radius: 14px 14px 0 0; }
+  .you-head { padding: 0 10px 2px; }
+  .boat-card, .slot { width: calc(var(--card-w) * .7); }
+  .boat-card.tiny, .slot.tiny { width: calc(var(--card-w) * .34); }
+  .luck-label { font-size: 10px; }
+  .tally-n { font-size: 17px; }
+  .actions { padding: 0 8px; }
+  .action { padding: 5px 10px; font-size: 12px; }
+}

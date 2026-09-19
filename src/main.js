@@ -1,20 +1,18 @@
-import { GameView } from './ui.js';
-import { VARIANTS, getVariant, DEFAULT_VARIANT } from './rules/index.js';
+import { GAMES, DEFAULT_GAME, SCREEN_IDS, getGame } from './games.js';
 
 const $ = (id) => document.getElementById(id);
 const STORE = 'gofish:prefs';
 
-const MIN_AI = 1;
-const MAX_AI = 5;
-
 const state = {
-  variantId: DEFAULT_VARIANT,
-  aiCount: 3,
+  gameId: DEFAULT_GAME,
+  aiCount: getGame(DEFAULT_GAME).defaultAi,
 };
+
+/** Views are built on demand and reused, so a game keeps its DOM wiring. */
+const views = new Map();
 
 const el = {
   title: $('title-screen'),
-  game: $('game-screen'),
   variantList: $('variant-list'),
   variantHint: $('variant-hint'),
   countValue: $('count-value'),
@@ -26,15 +24,14 @@ const el = {
   sheetTitle: $('sheet-title'),
 };
 
-const view = new GameView({ onExit: showTitle });
-
 // ------------------------------------------------------------------ prefs
 
 function loadPrefs() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORE) || '{}');
-    if (typeof saved.aiCount === 'number') state.aiCount = clampAi(saved.aiCount);
-    if (VARIANTS.some((v) => v.id === saved.variantId)) state.variantId = saved.variantId;
+    if (GAMES.some((g) => g.id === saved.gameId)) state.gameId = saved.gameId;
+    if (typeof saved.aiCount === 'number') state.aiCount = saved.aiCount;
+    state.aiCount = clampAi(state.aiCount);
   } catch {
     /* First run, private mode, or corrupt value: the defaults are fine. */
   }
@@ -48,37 +45,41 @@ function savePrefs() {
   }
 }
 
-const clampAi = (n) => Math.min(MAX_AI, Math.max(MIN_AI, Math.round(n)));
+function clampAi(n) {
+  const game = getGame(state.gameId);
+  return Math.min(game.maxAi, Math.max(game.minAi, Math.round(n)));
+}
 
 // ------------------------------------------------------------ title screen
 
-function renderVariants() {
+function renderGames() {
   const frag = document.createDocumentFragment();
-  for (const variant of VARIANTS) {
+  for (const game of GAMES) {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'chip';
     chip.role = 'radio';
-    chip.textContent = variant.name;
-    chip.setAttribute('aria-checked', String(variant.id === state.variantId));
+    chip.textContent = game.name;
+    chip.setAttribute('aria-checked', String(game.id === state.gameId));
     chip.addEventListener('click', () => {
-      state.variantId = variant.id;
+      state.gameId = game.id;
+      state.aiCount = clampAi(state.aiCount);
       savePrefs();
-      renderVariants();
+      renderGames();
+      renderCount();
     });
     frag.append(chip);
   }
   el.variantList.replaceChildren(frag);
-  el.variantHint.textContent = getVariant(state.variantId).tagline;
+  el.variantHint.textContent = getGame(state.gameId).tagline;
 }
 
 function renderCount() {
-  const variant = getVariant(state.variantId);
-  const total = state.aiCount + 1;
+  const game = getGame(state.gameId);
   el.countValue.textContent = state.aiCount;
-  el.countUp.disabled = state.aiCount >= MAX_AI;
-  el.countDown.disabled = state.aiCount <= MIN_AI;
-  el.countHint.textContent = `${total} players, ${variant.handSize(total)} cards each.`;
+  el.countUp.disabled = state.aiCount >= game.maxAi;
+  el.countDown.disabled = state.aiCount <= game.minAi;
+  el.countHint.textContent = game.setupHint(state.aiCount + 1);
 }
 
 function bumpCount(delta) {
@@ -89,28 +90,37 @@ function bumpCount(delta) {
   renderCount();
 }
 
+function hideScreens() {
+  for (const id of SCREEN_IDS) $(id).classList.add('hidden');
+}
+
 function showTitle() {
-  view.stop();
-  el.game.classList.add('hidden');
-  el.title.classList.remove('hidden');
+  for (const view of views.values()) view.stop();
+  hideScreens();
   $('results').classList.add('hidden');
-  renderVariants();
+  el.title.classList.remove('hidden');
+  renderGames();
   renderCount();
 }
 
 function startGame() {
+  const game = getGame(state.gameId);
+  for (const view of views.values()) view.stop();
+  if (!views.has(game.id)) views.set(game.id, game.createView());
+
   el.title.classList.add('hidden');
-  el.game.classList.remove('hidden');
+  hideScreens();
   $('results').classList.add('hidden');
-  view.start(getVariant(state.variantId), state.aiCount);
+  $(game.screenId).classList.remove('hidden');
+  game.start(views.get(game.id), state.aiCount);
 }
 
 // ------------------------------------------------------------------ sheet
 
 function openRules() {
-  const variant = getVariant(state.variantId);
-  el.sheetTitle.textContent = `How to play — ${variant.name}`;
-  el.sheetBody.innerHTML = `<ol>${variant.howToPlay.map((line) => `<li>${line}</li>`).join('')}</ol>`;
+  const game = getGame(state.gameId);
+  el.sheetTitle.textContent = `How to play — ${game.name}`;
+  el.sheetBody.innerHTML = `<ol>${game.howToPlay.map((line) => `<li>${line}</li>`).join('')}</ol>`;
   el.sheetBackdrop.classList.remove('hidden');
 }
 
@@ -125,11 +135,13 @@ $('count-down').addEventListener('click', () => bumpCount(-1));
 $('start-btn').addEventListener('click', startGame);
 $('title-rules-btn').addEventListener('click', openRules);
 $('rules-btn').addEventListener('click', openRules);
+$('cast-rules').addEventListener('click', openRules);
 $('sheet-close').addEventListener('click', closeRules);
 el.sheetBackdrop.addEventListener('click', (event) => {
   if (event.target === el.sheetBackdrop) closeRules();
 });
 $('quit-btn').addEventListener('click', showTitle);
+$('cast-quit').addEventListener('click', showTitle);
 $('again-btn').addEventListener('click', startGame);
 $('menu-btn').addEventListener('click', showTitle);
 

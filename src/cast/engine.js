@@ -1,0 +1,364 @@
+import { shuffle, sortHand, rankOrder } from '../cards.js';
+
+export const SET_LABELS = {
+  straightFlush: 'Straight flush',
+  trips: 'Three of a kind',
+  flush: 'Flush',
+  run: 'Run',
+};
+
+/** Three consecutive ranks. Aces run either low (A-2-3) or high (Q-K-A). */
+export function isRun(orders) {
+  const consecutive = (values) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    return sorted[1] === sorted[0] + 1 && sorted[2] === sorted[1] + 1;
+  };
+  if (consecutive(orders)) return true;
+  const ace = rankOrder('A');
+  return orders.includes(ace) && consecutive(orders.map((o) => (o === ace ? -1 : o)));
+}
+
+/** Score a finished boat, paying only its best match. Null if it is a bust. */
+export function evaluateBoat(cards, rules) {
+  if (cards.length < rules.boatSize) return null;
+  const orders = cards.map((c) => rankOrder(c.rank));
+  const sameRank = orders.every((o) => o === orders[0]);
+  const sameSuit = cards.every((c) => c.suit === cards[0].suit);
+  const run = isRun(orders);
+
+  if (run && sameSuit) return { kind: 'straightFlush', points: rules.points.straightFlush };
+  if (sameRank) return { kind: 'trips', points: rules.points.trips };
+  if (run) return { kind: 'run', points: rules.points.run };
+  if (sameSuit) return { kind: 'flush', points: rules.points.flush };
+  return null;
+}
+
+/**
+ * Cast & Boat's engine. Holds all state and advances only through the moves
+ * below, emitting events as it goes for the view to animate. Synchronous, with
+ * no timers of its own.
+ *
+ * Phases:
+ *   'cast'    the caster plays a card face up (and may spend luck first)
+ *   'respond' every other player answers face down, in turn
+ *   'boat'    the caster takes one answer, and may buy a second
+ *   'over'    somebody reached the target score
+ */
+export class CastGame {
+  constructor(rules, playerConfigs, rng = Math.random) {
+    this.rules = rules;
+    this.rng = rng;
+    this.targetScore = rules.targetScore(playerConfigs.length);
+    this.players = playerConfigs.map((config, index) => ({
+      index,
+      name: config.name,
+      isHuman: !!config.isHuman,
+      color: config.color,
+      hand: [],
+      boat: [],
+      luck: 0,
+      score: 0,
+    }));
+    this.draw = shuffle(rules.buildDeck(), rng);
+    this.discard = [];
+    this.caster = 0;
+    this.round = 1;
+    this.phase = 'cast';
+    this.castCard = null;
+    this.calledRank = null;
+    this.responses = [];
+    this.respondQueue = [];
+    this.boatsLeft = 0;
+    this.events = [];
+    this.winners = [];
+    this.#deal();
+  }
+
+  // ---------------------------------------------------------------- queries
+
+  get human() {
+    return this.players.find((p) => p.isHuman);
+  }
+
+  get isOver() {
+    return this.phase === 'over';
+  }
+
+  /** The player the game is currently waiting on. */
+  get current() {
+    if (this.phase === 'respond') return this.players[this.respondQueue[0]];
+    return this.players[this.caster];
+  }
+
+  /** Answers still on the table for the caster to take. */
+  get availableResponses() {
+    return this.responses.filter((r) => !r.taken);
+  }
+
+  /** A called rank forces anyone holding it to answer with it. */
+  forcedCardsFor(playerIndex) {
+    if (!this.calledRank) return [];
+    return this.players[playerIndex].hand.filter((c) => c.rank === this.calledRank);
+  }
+
+  canAfford(playerIndex, action) {
+    return this.players[playerIndex].luck >= this.rules.costs[action];
+  }
+
+  /** True while the caster may still pay for another card this turn. */
+  get canBuyExtraBoat() {
+    return this.phase === 'boat'
+      && this.boatsLeft === 0
+      && this.availableResponses.length > 0
+      && this.canAfford(this.caster, 'extraBoat');
+  }
+
+  drainEvents() {
+    const events = this.events;
+    this.events = [];
+    return events;
+  }
+
+  // ------------------------------------------------------------------ moves
+
+  /** The caster plays `cardId` face up. With `call`, its rank is demanded. */
+  cast(cardId, { call = false } = {}) {
+    if (this.phase !== 'cast') return { ok: false, error: 'not-casting' };
+    const caster = this.players[this.caster];
+    const card = caster.hand.find((c) => c.id === cardId);
+    if (!card) return { ok: false, error: 'no-such-card' };
+    if (call && !this.canAfford(this.caster, 'call')) return { ok: false, error: 'not-enough-luck' };
+
+    if (call) {
+      caster.luck -= this.rules.costs.call;
+      this.calledRank = card.rank;
+      this.#emit({ type: 'call', player: caster.index, rank: card.rank });
+    }
+
+    caster.hand = caster.hand.filter((c) => c.id !== cardId);
+    this.castCard = card;
+    this.responses = [];
+    this.#emit({ type: 'cast', player: caster.index, card, calledRank: this.calledRank });
+
+    // Answer order does not matter -- every answer is face down until they are
+    // all flipped -- so the player goes first and never sits waiting.
+    this.respondQueue = this.players
+      .filter((p) => p.index !== this.caster && p.hand.length > 0)
+      .sort((a, b) => Number(b.isHuman) - Number(a.isHuman))
+      .map((p) => p.index);
+
+    if (this.respondQueue.length === 0) {
+      this.#beginBoating();
+    } else {
+      this.phase = 'respond';
+      this.#emit({ type: 'await-response', player: this.respondQueue[0] });
+    }
+    return { ok: true };
+  }
+
+  /** A responder answers face down. */
+  respond(playerIndex, cardId) {
+    if (this.phase !== 'respond') return { ok: false, error: 'not-responding' };
+    if (this.respondQueue[0] !== playerIndex) return { ok: false, error: 'not-your-answer' };
+    const player = this.players[playerIndex];
+    const card = player.hand.find((c) => c.id === cardId);
+    if (!card) return { ok: false, error: 'no-such-card' };
+
+    const forced = this.forcedCardsFor(playerIndex);
+    if (forced.length > 0 && card.rank !== this.calledRank) return { ok: false, error: 'must-answer-call' };
+
+    player.hand = player.hand.filter((c) => c.id !== cardId);
+    this.responses.push({ player: playerIndex, card, taken: false, matched: false, forced: forced.length > 0 });
+    this.#emit({ type: 'respond', player: playerIndex, forced: forced.length > 0 });
+
+    this.respondQueue.shift();
+    if (this.respondQueue.length === 0) this.#reveal();
+    else this.#emit({ type: 'await-response', player: this.respondQueue[0] });
+    return { ok: true };
+  }
+
+  /** The caster takes one of the revealed answers into their boat. */
+  boat(responseIndex) {
+    if (this.phase !== 'boat') return { ok: false, error: 'not-boating' };
+    if (this.boatsLeft <= 0) return { ok: false, error: 'no-boats-left' };
+    const response = this.responses[responseIndex];
+    if (!response || response.taken) return { ok: false, error: 'unavailable' };
+
+    const caster = this.players[this.caster];
+    response.taken = true;
+    caster.boat.push(response.card);
+    this.boatsLeft -= 1;
+    this.#emit({ type: 'boat', player: caster.index, card: response.card, from: response.player });
+
+    if (this.#scoreBoat(caster)) return { ok: true };
+    if (this.boatsLeft > 0 && this.availableResponses.length > 0) return { ok: true };
+    if (this.canBuyExtraBoat) {
+      this.#emit({ type: 'offer-extra', player: caster.index });
+      return { ok: true };
+    }
+    this.#endTurn();
+    return { ok: true };
+  }
+
+  /** Pay luck for a second card this turn. */
+  buyExtraBoat() {
+    if (!this.canBuyExtraBoat) return { ok: false, error: 'unavailable' };
+    const caster = this.players[this.caster];
+    caster.luck -= this.rules.costs.extraBoat;
+    this.boatsLeft += 1;
+    this.#emit({ type: 'buy-extra', player: caster.index });
+    return { ok: true };
+  }
+
+  /** Decline the extra card and end the turn. */
+  endBoating() {
+    if (this.phase !== 'boat') return { ok: false, error: 'not-boating' };
+    this.#endTurn();
+    return { ok: true };
+  }
+
+  /** Pay luck to swap a card out of hand before casting. */
+  redraw(cardId) {
+    if (this.phase !== 'cast') return { ok: false, error: 'not-casting' };
+    const caster = this.players[this.caster];
+    if (!this.canAfford(this.caster, 'redraw')) return { ok: false, error: 'not-enough-luck' };
+    const card = caster.hand.find((c) => c.id === cardId);
+    if (!card) return { ok: false, error: 'no-such-card' };
+
+    caster.luck -= this.rules.costs.redraw;
+    caster.hand = caster.hand.filter((c) => c.id !== cardId);
+    this.discard.push(card);
+    const replacement = this.#drawCard();
+    if (replacement) {
+      caster.hand.push(replacement);
+      sortHand(caster.hand);
+    }
+    this.#emit({ type: 'redraw', player: caster.index, discarded: card, drawn: replacement });
+    return { ok: true, card: replacement };
+  }
+
+  // ----------------------------------------------------------------- private
+
+  #deal() {
+    for (const player of this.players) this.#refill(player);
+    this.#emit({ type: 'deal' });
+    this.#emit({ type: 'turn', player: this.caster, round: this.round });
+  }
+
+  #reveal() {
+    const { castCard, rules } = this;
+
+    // A short table leaves the caster nothing to choose between, so the pond
+    // answers too. Pond cards belong to nobody and earn nobody luck.
+    while (this.responses.length < rules.minAnswers) {
+      const card = this.#drawCard();
+      if (!card) break;
+      this.responses.push({ player: null, card, taken: false, matched: false, forced: false });
+      this.#emit({ type: 'pond-answer' });
+    }
+
+    for (const response of this.responses) {
+      response.matched = response.player !== null
+        && (response.card.suit === castCard.suit || response.card.rank === castCard.rank);
+    }
+    this.#emit({ type: 'reveal', responses: this.responses.map((r) => ({ ...r })) });
+
+    for (const response of this.responses) {
+      if (!response.matched) continue;
+      const player = this.players[response.player];
+      const before = player.luck;
+      player.luck = Math.min(rules.maxLuck, player.luck + rules.luckPerMatch);
+      if (player.luck > before) {
+        this.#emit({ type: 'luck', player: player.index, amount: player.luck - before, total: player.luck });
+      }
+    }
+    this.#beginBoating();
+  }
+
+  #beginBoating() {
+    this.phase = 'boat';
+    this.boatsLeft = this.responses.length > 0 ? 1 : 0;
+    if (this.boatsLeft === 0) {
+      this.#endTurn();
+      return;
+    }
+    this.#emit({ type: 'await-boat', player: this.caster });
+  }
+
+  /** Pay out a full boat and empty it. Returns true if the game ended. */
+  #scoreBoat(player) {
+    if (player.boat.length < this.rules.boatSize) return false;
+    const result = evaluateBoat(player.boat, this.rules);
+    const cards = player.boat.slice();
+    if (result) {
+      player.score += result.points;
+      this.#emit({ type: 'score', player: player.index, cards, ...result, total: player.score });
+    } else {
+      this.#emit({ type: 'bust', player: player.index, cards });
+    }
+    this.discard.push(...cards);
+    player.boat = [];
+
+    if (player.score >= this.targetScore) {
+      this.#endGame();
+      return true;
+    }
+    return false;
+  }
+
+  #endTurn() {
+    const spent = [];
+    if (this.castCard) spent.push(this.castCard);
+    for (const response of this.responses) if (!response.taken) spent.push(response.card);
+    this.discard.push(...spent);
+    if (spent.length) this.#emit({ type: 'discard', cards: spent });
+
+    this.castCard = null;
+    this.calledRank = null;
+    this.responses = [];
+    this.boatsLeft = 0;
+
+    for (const player of this.players) {
+      const drawn = this.#refill(player);
+      if (drawn) this.#emit({ type: 'refill', player: player.index, count: drawn });
+    }
+
+    this.caster = (this.caster + 1) % this.players.length;
+    if (this.caster === 0) this.round += 1;
+    this.phase = 'cast';
+    this.#emit({ type: 'turn', player: this.caster, round: this.round });
+  }
+
+  #refill(player) {
+    let drawn = 0;
+    while (player.hand.length < this.rules.handSize) {
+      const card = this.#drawCard();
+      if (!card) break;
+      player.hand.push(card);
+      drawn += 1;
+    }
+    if (drawn) sortHand(player.hand);
+    return drawn;
+  }
+
+  #drawCard() {
+    if (this.draw.length === 0) {
+      if (this.discard.length === 0) return null;
+      this.draw = shuffle(this.discard, this.rng);
+      this.discard = [];
+      this.#emit({ type: 'reshuffle', count: this.draw.length });
+    }
+    return this.draw.pop();
+  }
+
+  #endGame() {
+    this.phase = 'over';
+    const best = Math.max(...this.players.map((p) => p.score));
+    this.winners = this.players.filter((p) => p.score === best).map((p) => p.index);
+    this.#emit({ type: 'gameover', winners: this.winners });
+  }
+
+  #emit(event) {
+    this.events.push(event);
+  }
+}
