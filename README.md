@@ -34,13 +34,37 @@ Either way the site lands at `https://playfulbacon.github.io/go-fish/`.
 
 Pick a game and the number of computer players on the title screen.
 
-### Go Fish
+### Go Fish: Classic
 
 On your turn, tap a player and then tap a card in your hand to ask them for
 that rank (tapping in the other order works too). If they have it they hand
 every copy over and you go again; if not, they say *go fish* and you tap the
 pond to draw. Four of a kind is a book. When all thirteen books are made, the
 most books wins.
+
+### Go Fish: Tide Pool
+
+Go Fish in clear water. Four cards lie **face up in a pool**, and when told to
+go fish you pick the one you want — or draw blind from the pile instead, which
+is the only way to win another turn. Everyone also keeps **one card face up**
+in front of them, so part of every hand is public and can be asked for by
+name. Lose your face-up card and you choose a replacement from your hand, then
+draw back up to five.
+
+#### Rules that were filled in
+
+- **A card you could already see never wins you another turn.** A blind draw
+  that finds your rank does, and prising a hidden card out of someone does,
+  but taking from the open pool does not, and nor does helping yourself to a
+  face-up card. Without that last part the table is a shopping list: at six
+  players, farming visible cards ran turns of a dozen asks and handed the late
+  seats a 27-point win-rate edge. With it, seats finish within 4.4 points and
+  turns run the length they do in Classic.
+- **The face-up card counts as yours** for asking, for being asked, and for
+  books. Otherwise a fourth card stuck on show would be a book you could never
+  complete.
+- **Hands are five**, and the draw back up to five happens when you replace
+  your face-up card, as specified.
 
 ### Cast & Boat
 
@@ -121,7 +145,7 @@ playable exactly as they were.
 
     src/games.js          the menu: every playable version
     src/cards.js          shared card primitives
-    src/rules/            Go Fish rule variants (one file each)
+    src/rules/            Go Fish rule variants (classic.js, tidepool.js)
     src/engine.js         Go Fish game logic, driven by a variant
     src/ai.js  src/ui.js  Go Fish computer players and table
     src/cast/             Cast & Boat: rules, engine, ai, ui
@@ -138,6 +162,12 @@ appears in the menu on its own.
 Computer players in both games read only from what is public — the event log in
 Go Fish, the cast card and face-up boats in Cast & Boat. Neither ever looks at
 a hand.
+
+Tide Pool is the worked example of how far a variant can go without a new
+engine: it adds a face-up pool and a face-up card per player purely through
+`poolSize` and `showingCard`, which the engine treats as off for any variant
+that does not set them. Classic's behaviour is identical before and after,
+checked by simulating 2000 games of it against the same move counts.
 
 A Go Fish variant is a plain object:
 

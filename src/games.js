@@ -22,7 +22,8 @@ const goFishGames = VARIANTS.map((variant) => ({
   minAi: 1,
   maxAi: 5,
   defaultAi: 3,
-  setupHint: (total) => `${total} players, ${variant.handSize(total)} cards each.`,
+  setupHint: (total) => `${total} players, ${variant.handSize(total)} cards each`
+    + (variant.showingCard ? ' plus one face up.' : '.'),
   createView: () => new GameView({}),
   start: (view, aiCount) => view.start(variant, aiCount),
 }));

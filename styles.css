@@ -1174,3 +1174,102 @@ button { font: inherit; color: inherit; cursor: pointer; }
   animation: none;
 }
 .boat-card.swappable:not(:disabled):active { transform: scale(.94); }
+
+/* ==================================== Tide Pool: open water and face-up cards */
+
+/* The four cards you can choose between when told to go fish. */
+.pool {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 0;
+}
+.pool:empty { display: none; }
+
+.pool-card {
+  flex: none;
+  width: var(--card-w);
+  aspect-ratio: 5 / 7;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 0;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--card-black);
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+@media (prefers-color-scheme: dark) { .pool-card { color: var(--ink); } }
+.pool-card.red { color: var(--card-red); }
+.pool-card .r { font-size: calc(var(--card-w) * .38); line-height: 1; }
+.pool-card .s { font-size: calc(var(--card-w) * .3); line-height: 1; }
+.pool-card.enter { animation: dealIn .36s cubic-bezier(.2, .9, .3, 1.15) backwards; }
+
+button.pool-card { cursor: default; }
+button.pool-card.live {
+  cursor: pointer;
+  box-shadow: 0 0 0 2px var(--accent), var(--shadow-md);
+}
+button.pool-card.live:active { transform: scale(.94); }
+
+/* One card each player keeps face up. */
+.showing-slot {
+  display: flex;
+  justify-content: center;
+  min-height: calc(var(--card-w) * .34 * 1.4);
+}
+
+.showing-card {
+  width: calc(var(--card-w) * .38);
+  aspect-ratio: 5 / 7;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--card-black);
+}
+@media (prefers-color-scheme: dark) { .showing-card { color: var(--ink); } }
+.showing-card.red { color: var(--card-red); }
+.showing-card .r { font-size: calc(var(--card-w) * .2); }
+.showing-card .s { font-size: calc(var(--card-w) * .16); }
+.showing-card.landed { animation: landed .34s cubic-bezier(.2, .9, .3, 1.2); }
+
+.showing-empty {
+  width: calc(var(--card-w) * .38);
+  aspect-ratio: 5 / 7;
+  border: 1px dashed var(--line);
+  border-radius: 4px;
+  opacity: .45;
+}
+
+/* The player's own face-up card sits beside their name. */
+.you-showing { display: flex; align-items: center; gap: 6px; }
+.you-showing .showing-card, .you-showing .showing-empty { width: calc(var(--card-w) * .5); }
+.you-showing .showing-card .r { font-size: calc(var(--card-w) * .26); }
+.you-showing .showing-card .s { font-size: calc(var(--card-w) * .2); }
+.you-showing-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* Choosing which card to turn face up. */
+.hand.placing .card { box-shadow: 0 0 0 1.5px var(--accent), var(--shadow-sm); }
+
+@media (max-height: 560px) {
+  .pool { gap: 4px; }
+  .showing-slot { min-height: calc(var(--card-w) * .3 * 1.4); }
+}

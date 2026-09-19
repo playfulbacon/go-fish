@@ -12,6 +12,15 @@ const BEAT = { think: 950, fish: 800, bubble: 420, hint: 1500 };
 const $ = (id) => document.getElementById(id);
 const suitOf = (id) => SUITS.find((s) => s.id === id);
 
+/** A face-up card element of the given class. */
+function faceCard(card, className, tag = 'div') {
+  const el = document.createElement(tag);
+  if (tag === 'button') el.type = 'button';
+  el.className = `${className}${suitOf(card.suit).color === 'red' ? ' red' : ''}`;
+  el.innerHTML = `<span class="r">${card.rank}</span><span class="s">${suitOf(card.suit).symbol}</span>`;
+  return el;
+}
+
 export class GameView {
   constructor({ onExit }) {
     this.onExit = onExit;
@@ -30,6 +39,8 @@ export class GameView {
       screen: $('game-screen'),
       opponents: $('opponents'),
       pond: $('pond'),
+      pool: $('pool'),
+      youShowing: $('you-showing'),
       pondCards: $('pond-cards'),
       pondCount: $('pond-count'),
       turnPill: $('turn-pill'),
@@ -125,15 +136,21 @@ export class GameView {
     if (gameOver) this.#after(Math.max(700, beat * BEAT.bubble + 500), () => this.#showResults());
 
     this.#render();
-    const player = this.game.current;
-    if (lastLine) this.#setStatus(lastLine);
+    const player = this.game.awaiting;
+    // Being asked to turn a card face up interrupts someone else's turn, so
+    // say so at once rather than leaving the last action on screen first.
+    const interrupting = this.game.phase === 'replace' && player.isHuman;
+    if (interrupting) this.#setStatus(this.#promptText());
+    else if (lastLine) this.#setStatus(lastLine);
     else if (player.isHuman) this.#setStatus(this.#promptText());
 
     if (this.game.isOver) return;
 
     if (player.isHuman) {
       // Let the player read what just happened, then remind them what to do.
-      if (lastLine) this.#after(Math.max(BEAT.hint, beat * BEAT.bubble), () => this.#setStatus(this.#promptText()));
+      if (lastLine && !interrupting) {
+        this.#after(Math.max(BEAT.hint, beat * BEAT.bubble), () => this.#setStatus(this.#promptText()));
+      }
     } else {
       const wait = Math.max(this.game.phase === 'fish' ? BEAT.fish : BEAT.think, beat * BEAT.bubble + 250);
       this.#after(wait, () => {
@@ -180,11 +197,17 @@ export class GameView {
         const cards = `${event.count} <b>${event.count === 1 ? rankSingular(event.rank) : rankPlural(event.rank)}</b>`;
         return `${who(event.from)} ${you(event.from) ? 'hand over' : 'hands over'} ${cards}.`;
       }
+      case 'showing':
+        return `${who(event.player)} ${you(event.player) ? 'turn' : 'turns'} a card face up.`;
+      case 'stalemate':
+        return 'No one can make another book.';
       case 'draw':
         if (you(event.player)) {
           const card = `<b>${rankSingular(event.card.rank)} of ${suitOf(event.card.suit).symbol}</b>`;
+          if (event.fromPool) return `You take the ${card} from the pool.`;
           return event.lucky ? `You fished up the ${card} — go again!` : `You fished up the ${card}.`;
         }
+        if (event.fromPool) return `${who(event.player)} takes a card from the pool.`;
         return event.lucky
           ? `${who(event.player)} fished exactly what they asked for — they go again.`
           : `${who(event.player)} fishes a card.`;
@@ -203,8 +226,13 @@ export class GameView {
 
   #promptText() {
     const game = this.game;
-    if (game.isOver || !game.current.isHuman) return '&nbsp;';
-    if (game.phase === 'fish') return 'Tap the pond to fish for a card.';
+    if (game.isOver || !game.awaiting.isHuman) return '&nbsp;';
+    if (game.phase === 'replace') return 'Tap a card to turn it face up.';
+    if (game.phase === 'fish') {
+      return game.pool.length
+        ? 'Take a card from the pool, or tap the pond to draw blind.'
+        : 'Tap the pond to fish for a card.';
+    }
     if (this.selectedTarget === null) return 'Tap a player, then tap a card to ask for it.';
     return `Asking <b>${game.players[this.selectedTarget].name}</b> — now tap a card.`;
   }
@@ -214,7 +242,7 @@ export class GameView {
   #render() {
     const game = this.game;
     const human = game.human;
-    const myTurn = !game.isOver && game.current.isHuman;
+    const myTurn = !game.isOver && game.current.isHuman && game.phase !== 'replace';
 
     this.el.turnPill.textContent = game.isOver
       ? 'Game over'
@@ -222,7 +250,9 @@ export class GameView {
     this.el.turnPill.classList.toggle('mine', myTurn);
 
     this.#renderOpponents();
+    this.#renderPool();
     this.#renderPond();
+    this.#renderShowing(this.el.youShowing, human, 'Showing');
     this.#renderBooks(this.el.youBooks, human);
     this.#renderHand(human, myTurn);
   }
@@ -240,6 +270,7 @@ export class GameView {
           ${player.name.charAt(0)}<span class="avatar-count">0</span>
         </span>
         <span class="opponent-name">${player.name}</span>
+        <span class="showing-slot"></span>
         <span class="books-row"></span>`;
       button.addEventListener('click', () => this.#onOpponentTap(player.index));
       this.el.opponents.append(button);
@@ -247,6 +278,7 @@ export class GameView {
         button,
         count: button.querySelector('.avatar-count'),
         books: button.querySelector('.books-row'),
+        showing: button.querySelector('.showing-slot'),
       });
     }
   }
@@ -260,8 +292,51 @@ export class GameView {
       refs.button.classList.toggle('active', !game.isOver && game.turn === index);
       refs.button.disabled = !canAsk || player.hand.length === 0;
       refs.button.setAttribute('aria-pressed', String(this.selectedTarget === index));
+      this.#renderShowing(refs.showing, player);
       this.#renderBooks(refs.books, player);
     }
+  }
+
+  /** A player's face-up card, or an empty slot. Nothing at all if the variant
+   *  does not use one. */
+  #renderShowing(container, player, label = null) {
+    if (!this.game.rules.showingCard) { container.replaceChildren(); return; }
+    const frag = document.createDocumentFragment();
+    if (label) {
+      const tag = document.createElement('span');
+      tag.className = 'you-showing-label';
+      tag.textContent = label;
+      frag.append(tag);
+    }
+    if (player.showing) {
+      const el = faceCard(player.showing, 'showing-card');
+      if (container.dataset.card !== player.showing.id) el.classList.add('landed');
+      container.dataset.card = player.showing.id;
+      frag.append(el);
+    } else {
+      const slot = document.createElement('div');
+      slot.className = 'showing-empty';
+      container.dataset.card = '';
+      frag.append(slot);
+    }
+    container.replaceChildren(frag);
+  }
+
+  /** The face-up cards you may fish from, for variants with a pool. */
+  #renderPool() {
+    const game = this.game;
+    if (!game.rules.poolSize) { this.el.pool.replaceChildren(); return; }
+    const live = !game.isOver && game.awaiting.isHuman && game.phase === 'fish';
+    const frag = document.createDocumentFragment();
+
+    game.pool.forEach((card, index) => {
+      const el = faceCard(card, `pool-card${live ? ' live' : ''}`, live ? 'button' : 'div');
+      if (!this.poolIds || !this.poolIds.has(card.id)) el.classList.add('enter');
+      if (live) el.addEventListener('click', () => this.#onPoolTap(index));
+      frag.append(el);
+    });
+    this.el.pool.replaceChildren(frag);
+    this.poolIds = new Set(game.pool.map((c) => c.id));
   }
 
   /**
@@ -315,7 +390,7 @@ export class GameView {
     this.pileCards.forEach((card, i) => { card.style.opacity = i < visible ? '1' : '0'; });
 
     this.el.pondCount.textContent = left;
-    const live = !game.isOver && game.current.isHuman && game.phase === 'fish' && left > 0;
+    const live = !game.isOver && game.awaiting.isHuman && game.phase === 'fish' && left > 0;
     this.el.pond.classList.toggle('live', live);
     this.el.pond.classList.toggle('empty', left === 0);
     this.el.pond.disabled = !live;
@@ -323,7 +398,9 @@ export class GameView {
 
   #renderHand(human, myTurn) {
     const hand = this.el.hand;
-    hand.classList.toggle('live', myTurn && this.game.phase === 'ask');
+    const placing = this.game.phase === 'replace' && this.game.replacing === human.index;
+    hand.classList.toggle('live', (myTurn && this.game.phase === 'ask') || placing);
+    hand.classList.toggle('placing', placing);
     hand.classList.toggle('tight', human.hand.length > 6);
 
     if (human.hand.length === 0) {
@@ -346,10 +423,12 @@ export class GameView {
         el.classList.add('enter');
         el.style.animationDelay = `${Math.min(i * 28, 260)}ms`;
       }
-      if (card.rank === this.selectedRank) el.classList.add('selected');
+      if (!placing && card.rank === this.selectedRank) el.classList.add('selected');
       el.dataset.rank = card.rank;
       el.innerHTML = `<span class="r">${card.rank}</span><span class="s">${suitOf(card.suit).symbol}</span>`;
-      el.addEventListener('click', () => this.#onCardTap(card.rank));
+      el.addEventListener('click', () => (placing
+        ? this.#onPlaceShowing(card.id)
+        : this.#onCardTap(card.rank)));
       frag.append(el);
     });
     hand.replaceChildren(frag);
@@ -400,9 +479,28 @@ export class GameView {
 
   #onPondTap() {
     const game = this.game;
-    if (game.isOver || !game.current.isHuman || game.phase !== 'fish') return;
+    if (game.isOver || !game.awaiting.isHuman || game.phase !== 'fish') return;
     this.#clearTimers();
-    game.fish();
+    const result = game.fish({ from: 'pond' });
+    if (!result.ok) { this.#render(); return; }
+    this.#present(this.game.drainEvents());
+  }
+
+  #onPoolTap(index) {
+    const game = this.game;
+    if (game.isOver || !game.awaiting.isHuman || game.phase !== 'fish') return;
+    this.#clearTimers();
+    const result = game.fish({ from: 'pool', index });
+    if (!result.ok) { this.#render(); return; }
+    this.#present(this.game.drainEvents());
+  }
+
+  #onPlaceShowing(cardId) {
+    const game = this.game;
+    if (game.phase !== 'replace') return;
+    this.#clearTimers();
+    const result = game.placeShowing(cardId);
+    if (!result.ok) { this.#render(); return; }
     this.#present(this.game.drainEvents());
   }
 
