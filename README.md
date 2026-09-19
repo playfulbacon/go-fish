@@ -49,10 +49,14 @@ A different game, not a Go Fish variant, with its own engine and table.
 On your turn you are the **caster**: play one card face up into the pond.
 Everyone else answers with a card face down, and all the answers flip at once.
 Any answer matching your cast card's suit or rank earns that player **luck**.
-You then **boat** one answer — it goes face up in front of you — and the rest
-are discarded. Three cards in your boat scores: three of a rank, three of a
-suit, or a run of three. Then the boat empties, set or not, so the third card
+You may then **boat** one answer — it goes face up in front of you — and the
+rest are discarded. Three cards in your boat scores: three of a rank, three of
+a suit, or a run of three. Then the boat empties, set or not, so the third card
 is the whole gamble.
+
+Boating is never compulsory. With two cards already in your boat, a third that
+makes no set clears it for nothing, so **taking nothing** and keeping the pair
+is often better than filling the boat — at the cost of a turn.
 
 Luck buys three special actions, all at the same price:
 
@@ -103,6 +107,11 @@ are all tunable in one place, `src/cast/rules.js`:
 - **A boat swap happens during your cast**, before you play a card, and the two
   cards must belong to different players. Boat sizes never change, so a swap
   can never complete a boat on its own.
+- **Computer players hold out, but not forever.** Simulated with perfect
+  patience, a player protecting a good pair could wait on a card that never
+  came, and a few games per thousand never ended. They now take the card anyway
+  a quarter of the time, which is both more human and what makes the game
+  certain to finish.
 
 ## Adding versions
 

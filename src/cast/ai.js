@@ -20,6 +20,13 @@ export function boatValue(boat, card, rules) {
   return pairPotential(next[0], next[1]);
 }
 
+/** A part-built boat worth protecting rather than busting: a pair, or two to
+ *  a run or a flush. Anything below this has no future and may as well reset. */
+const KEEP_WORTH_WAITING_FOR = 4;
+
+/** Chance of boating anyway rather than holding out for the card we want. */
+const IMPATIENCE = 0.25;
+
 /** How promising a part-built boat is. Boats never sit full, so 0-2 cards. */
 export function boatPotential(boat) {
   if (boat.length === 0) return 0;
@@ -119,6 +126,28 @@ export function chooseBoat(game, player) {
   return best ? best.index : null;
 }
 
+/**
+ * Whether to end the turn rather than take `pick`.
+ *
+ * Only a boat one card short of full can be *lost* by taking a card: a third
+ * card that makes no set clears the boat for nothing. Declining protects a
+ * promising pair. A pair with no future is a different matter -- there the
+ * bust is a free reset, so take the card and start again.
+ */
+export function shouldDeclineBoat(game, player, pick, rng = Math.random) {
+  if (pick === null || pick === undefined) return true;
+  const { rules } = game;
+  if (player.boat.length !== rules.boatSize - 1) return false;
+  const card = game.responses[pick].card;
+  if (evaluateBoat([...player.boat, card], rules)) return false;
+  if (boatPotential(player.boat) < KEEP_WORTH_WAITING_FOR) return false;
+  // Holding out costs a turn, and a player who never gives up can wait on a
+  // card that does not come: simulated with perfect patience, a few games in a
+  // thousand never ended. Taking it anyway now and then is both more human and
+  // what guarantees the game converges.
+  return rng() > IMPATIENCE;
+}
+
 /** Whether to pay luck for a second card this turn. */
 export function shouldBuyExtraBoat(game, player) {
   if (!game.canBuyExtraBoat) return false;
@@ -180,7 +209,8 @@ export function autoPlay(game, rng = Math.random) {
     case 'boat': {
       if (game.boatsLeft > 0) {
         const pick = chooseBoat(game, player);
-        return pick === null ? game.endBoating() : game.boat(pick);
+        if (shouldDeclineBoat(game, player, pick, rng)) return game.endBoating();
+        return game.boat(pick);
       }
       if (shouldBuyExtraBoat(game, player)) return game.buyExtraBoat();
       return game.endBoating();

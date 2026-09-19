@@ -179,6 +179,8 @@ export class CastView {
         return `${name(event.player)} — <b>${SET_LABELS[event.kind]}</b>, +${event.points}.`;
       case 'bust':
         return `${name(event.player)} ${you(event.player) ? 'fill' : 'fills'} the boat with no set.`;
+      case 'decline':
+        return `${name(event.player)} ${you(event.player) ? 'boat' : 'boats'} nothing.`;
       case 'redraw':
         return 'Swapped a card out of your hand.';
       case 'reshuffle':
@@ -211,7 +213,11 @@ export class CastView {
       return 'Answer face down.';
     }
     if (game.phase === 'boat') {
-      if (game.boatsLeft > 0) return 'Tap a card to boat it.';
+      if (game.boatsLeft > 0) {
+        return game.boatedThisTurn === 0
+          ? 'Tap a card to boat it, or take nothing.'
+          : 'Tap another card to boat, or end your turn.';
+      }
       return 'Boat another, or end your turn.';
     }
     return '&nbsp;';
@@ -433,14 +439,16 @@ export class CastView {
           });
         }
       }
-      if (game.phase === 'boat' && game.boatsLeft === 0) {
+      if (game.phase === 'boat') {
         if (game.canBuyExtraBoat) {
           button(`Boat another <i>${costs.extraBoat}</i>`, false, () => {
             game.buyExtraBoat();
             this.#present(game.drainEvents());
           });
         }
-        button('End turn', false, () => {
+        // Boating is optional, so this is offered from the start of the phase.
+        button(game.boatedThisTurn === 0 ? 'Take nothing' : 'End turn', false, () => {
+          this.#clearTimers();
           game.endBoating();
           this.#present(game.drainEvents());
         });

@@ -69,6 +69,7 @@ export class CastGame {
     this.responses = [];
     this.respondQueue = [];
     this.boatsLeft = 0;
+    this.boatedThisTurn = 0;
     this.events = [];
     this.winners = [];
     this.#deal();
@@ -212,6 +213,7 @@ export class CastGame {
     response.taken = true;
     caster.boat.push(response.card);
     this.boatsLeft -= 1;
+    this.boatedThisTurn += 1;
     this.#emit({ type: 'boat', player: caster.index, card: response.card, from: response.player });
 
     if (this.#scoreBoat(caster)) return { ok: true };
@@ -234,9 +236,14 @@ export class CastGame {
     return { ok: true };
   }
 
-  /** Decline the extra card and end the turn. */
+  /**
+   * End the turn without taking (another) card. Boating is never compulsory:
+   * with two cards already in the boat, a third that makes no set would clear
+   * the boat for nothing, so declining is often the right play.
+   */
   endBoating() {
     if (this.phase !== 'boat') return { ok: false, error: 'not-boating' };
+    if (this.boatedThisTurn === 0) this.#emit({ type: 'decline', player: this.caster });
     this.#endTurn();
     return { ok: true };
   }
@@ -309,6 +316,7 @@ export class CastGame {
 
   #beginBoating() {
     this.phase = 'boat';
+    this.boatedThisTurn = 0;
     this.boatsLeft = this.responses.length > 0 ? 1 : 0;
     if (this.boatsLeft === 0) {
       this.#endTurn();
@@ -349,6 +357,7 @@ export class CastGame {
     this.called = null;
     this.responses = [];
     this.boatsLeft = 0;
+    this.boatedThisTurn = 0;
 
     for (const player of this.players) {
       const drawn = this.#refill(player);
