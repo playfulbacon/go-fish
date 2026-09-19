@@ -20,6 +20,13 @@ export function boatValue(boat, card, rules) {
   return pairPotential(next[0], next[1]);
 }
 
+/** How promising a part-built boat is. Boats never sit full, so 0-2 cards. */
+export function boatPotential(boat) {
+  if (boat.length === 0) return 0;
+  if (boat.length === 1) return 2;
+  return pairPotential(boat[0], boat[1]);
+}
+
 /** How promising two cards are as the start of a set. */
 function pairPotential(a, b) {
   const gap = Math.abs(rankOrder(a.rank) - rankOrder(b.rank));
@@ -51,23 +58,30 @@ export function chooseCast(game, player, rng = Math.random) {
   const { rules } = game;
   const dump = leastUseful(player.hand, player.boat, rules);
 
-  // Calling is worth it when a particular rank would build the boat: it forces
-  // everyone holding that rank to hand one over.
+  // Calling forces everyone holding the named rank or suit to hand one over,
+  // so it is worth paying for when the boat wants more of something specific.
   if (player.luck >= rules.costs.call && player.boat.length > 0) {
-    const wanted = player.hand.filter((card) => {
-      const value = boatValue(player.boat, card, rules);
-      return value >= 6 && card.id !== dump.card.id;
-    });
-    // Call with a card whose rank we want more of, not the one we are dumping.
-    for (const card of wanted) {
-      const keeps = player.hand.some((other) => other.id !== card.id && other.rank === card.rank);
-      if (keeps || player.boat.some((b) => b.rank === card.rank)) {
-        return { cardId: card.id, call: true };
+    let best = null;
+    for (const card of player.hand) {
+      if (card.id === dump.card.id) continue;
+      // A rank call chases three of a kind; a suit call chases a flush.
+      const wantsRank = player.boat.some((b) => b.rank === card.rank);
+      const wantsSuit = player.boat.every((b) => b.suit === card.suit);
+      if (wantsRank) {
+        const score = 8 + rng();
+        if (!best || score > best.score) best = { cardId: card.id, call: 'rank', score };
+      }
+      if (wantsSuit) {
+        // A suit is thirteen cards to a rank's four, so it lands far more
+        // often -- worth less per hit, but much more reliable.
+        const score = 6 + rng();
+        if (!best || score > best.score) best = { cardId: card.id, call: 'suit', score };
       }
     }
+    if (best) return { cardId: best.cardId, call: best.call };
   }
 
-  return { cardId: dump.card.id, call: false };
+  return { cardId: dump.card.id, call: null };
 }
 
 /** Choose what to answer a cast with. */
@@ -115,6 +129,35 @@ export function shouldBuyExtraBoat(game, player) {
   return value >= 10 || (player.luck >= game.rules.costs.extraBoat + 3 && value >= 6);
 }
 
+/**
+ * The best boat swap available, or null. Weighs what the swap does to our own
+ * boat against the damage it does to whoever we take from, so breaking up two
+ * rivals is on the table even when we gain nothing directly.
+ */
+export function chooseBoatSwap(game, player) {
+  const cards = game.swappableCards;
+  let best = null;
+
+  for (const a of cards) {
+    for (const b of cards) {
+      if (a.player >= b.player) continue;   // each unordered pair once
+      const boats = new Map();
+      for (const p of game.players) boats.set(p.index, p.boat.slice());
+      boats.get(a.player)[a.index] = b.card;
+      boats.get(b.player)[b.index] = a.card;
+
+      let gain = 0;
+      for (const p of game.players) {
+        const before = boatPotential(p.boat);
+        const after = boatPotential(boats.get(p.index));
+        gain += p.index === player.index ? after - before : (before - after) * 0.6;
+      }
+      if (!best || gain > best.gain) best = { a: { player: a.player, index: a.index }, b: { player: b.player, index: b.index }, gain };
+    }
+  }
+  return best;
+}
+
 /** Play one beat for whichever computer player the game is waiting on. */
 export function autoPlay(game, rng = Math.random) {
   if (game.isOver) return null;
@@ -123,6 +166,12 @@ export function autoPlay(game, rng = Math.random) {
 
   switch (game.phase) {
     case 'cast': {
+      // A swap is worth paying for when it clearly moves the table our way.
+      // Bounded: paying for one drops luck below the threshold.
+      if (game.canSwapBoats) {
+        const swap = chooseBoatSwap(game, player);
+        if (swap && swap.gain >= 3) return game.swapBoats(swap.a, swap.b);
+      }
       const move = chooseCast(game, player, rng);
       return game.cast(move.cardId, { call: move.call });
     }

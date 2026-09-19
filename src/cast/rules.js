@@ -35,10 +35,11 @@ export const castAndBoat = {
   /** Hoarding cap, so luck stays a currency rather than a savings account. */
   maxLuck: 6,
 
+  /** Every special action costs the same, so the choice is value, not price. */
   costs: {
-    call: 3,       // cast a rank every responder holding it must answer with
-    extraBoat: 3,  // boat a second card this turn
-    redraw: 1,     // swap a card out of your hand
+    call: 2,       // name the cast card's rank or suit; holders must answer with it
+    extraBoat: 2,  // boat a second card this turn
+    boatSwap: 2,   // exchange any two boated cards between two players
   },
 
   /** Points for a finished boat. Only the best match is paid. */
@@ -57,7 +58,7 @@ export const castAndBoat = {
     'Any answer matching your cast card’s suit or rank earns that player <em>luck</em>.',
     'You then <em>boat</em> one of the answers — it goes face up in front of you. The rest are discarded.',
     'Three cards in your boat scores: three of a rank, three of a suit, or a run of three. Then the boat empties, set or not.',
-    'Spend luck to call a rank everyone must answer with, to boat a second card, or to swap a card out of your hand.',
+    'Spend luck to call the rank or suit everyone must answer with, to boat a second card, or to swap any two boated cards between players.',
     'Everyone refills to five cards, and the next player casts. First to the target score wins.',
   ],
 };

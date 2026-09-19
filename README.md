@@ -54,9 +54,17 @@ are discarded. Three cards in your boat scores: three of a rank, three of a
 suit, or a run of three. Then the boat empties, set or not, so the third card
 is the whole gamble.
 
-Spend luck to **call a rank** (everyone holding it must answer with it), to
-**boat a second card**, or to **swap a card** out of your hand. Everyone
-refills to five and the next player casts. First to the target score wins.
+Luck buys three special actions, all at the same price:
+
+- **Call** — name the rank *or* the suit of the card you cast. Everyone holding
+  it must answer with it.
+- **Boat another** — take a second answer this turn.
+- **Swap boats** — exchange any two boated cards belonging to different
+  players. Neither has to be yours, so you can trade your dud for someone's
+  good card, or just break up two rivals.
+
+Everyone refills to five and the next player casts. First to the target score
+wins.
 
 #### Rules that were filled in
 
@@ -75,15 +83,26 @@ are all tunable in one place, `src/cast/rules.js`:
   (A-2-3) or high (Q-K-A) but do not wrap.
 - **Target score** scales with the table — 12/12/14/18/22 for 2–6 players —
   because more players means more answers, so boats land more often. Tuned by
-  simulation so every table takes roughly 16–26 casts each.
-- **Luck** is 1 per matching answer, capped at 6. Call costs 3, an extra boat
-  3, a swap 1. The cap matters: uncapped, players sat on 8 of 10 and luck
-  stopped being a decision.
+  simulation so every table runs about the same length in total turns (49–57),
+  which is what a player actually sits through, since you act on every turn
+  whether you are casting or answering.
+- **Luck** is 1 per matching answer, capped at 6, and every action costs 2. The
+  cap matters: uncapped, players sat on 8 of 10 and luck stopped being a
+  decision. So does the flat price — an earlier build priced the actions 3/3/1,
+  and the cheap one got spammed 66 times per 100 casts, starving the extra boat
+  that actually scores. Levelling every action to 2 nearly doubled extra boats
+  and took the set rate from 20% to 30%.
+- **Calling a suit is more reliable than calling a rank**, since a suit is
+  thirteen cards to a rank's four. It is priced the same on purpose: the rank
+  call chases three of a kind for 5, the suit call chases a flush for 3.
 - **The caster boats from the answers only**, not from their own cast card.
   Taking your own cast back would be a guaranteed free boat every turn, which
   removes the reason to cast anything.
-- **A called rank** is the rank of the card you cast, so calling is one tap
-  rather than a separate rank picker.
+- **A call names the card you cast** — its rank or its suit, depending on which
+  button you armed — so calling is one tap rather than a separate picker.
+- **A boat swap happens during your cast**, before you play a card, and the two
+  cards must belong to different players. Boat sizes never change, so a swap
+  can never complete a boat on its own.
 
 ## Adding versions
 

@@ -1,6 +1,6 @@
 import { CastGame, SET_LABELS } from './engine.js';
 import { autoPlay } from './ai.js';
-import { SUITS, rankPlural } from '../cards.js';
+import { SUITS, rankPlural, suitName } from '../cards.js';
 
 const AI_NAMES = ['Ruby', 'Milo', 'Pip', 'Nova', 'Otis'];
 const COLORS = ['#e0663f', '#3f7fe0', '#8a63d2', '#d4a02c', '#2f9e6f', '#0f766e'];
@@ -11,9 +11,14 @@ const BEAT = { cast: 620, respond: 320, reveal: 760, boat: 640, banner: 1250, th
 const $ = (id) => document.getElementById(id);
 const suitOf = (id) => SUITS.find((s) => s.id === id);
 
+/** What a call named, for prose: "Queens" or "Hearts". */
+const calledLabel = (called) =>
+  called.kind === 'rank' ? rankPlural(called.value) : suitName(called.value);
+
 /** A face-up card element. */
-function cardEl(card, className = 'card') {
-  const el = document.createElement('div');
+function cardEl(card, className = 'card', interactive = false) {
+  const el = document.createElement(interactive ? 'button' : 'div');
+  if (interactive) el.type = 'button';
   el.className = `${className}${suitOf(card.suit).color === 'red' ? ' red' : ''}`;
   el.innerHTML = `<span class="r">${card.rank}</span><span class="s">${suitOf(card.suit).symbol}</span>`;
   return el;
@@ -24,8 +29,9 @@ export class CastView {
     this.game = null;
     this.timers = [];
     this.visualTimers = [];
-    this.callArmed = false;
+    this.callKind = null;   // 'rank' | 'suit' while a call is armed
     this.swapArmed = false;
+    this.swapPick = null;   // first boated card chosen for a swap
     this.rivalEls = new Map();
     this.handIds = new Set();
 
@@ -62,8 +68,9 @@ export class CastView {
     }
 
     this.game = new CastGame(rules, players);
-    this.callArmed = false;
+    this.callKind = null;
     this.swapArmed = false;
+    this.swapPick = null;
     this.handIds = new Set();
     this.el.results.classList.add('hidden');
     this.#buildRivals();
@@ -149,7 +156,12 @@ export class CastView {
 
     switch (event.type) {
       case 'call':
-        return `${name(event.player)} ${you(event.player) ? 'call' : 'calls'} <b>${rankPlural(event.rank)}</b>.`;
+        return `${name(event.player)} ${you(event.player) ? 'call' : 'calls'} <b>${calledLabel(event)}</b>.`;
+      case 'boat-swap': {
+        const a = `<b>${event.a.card.rank}${suitOf(event.a.card.suit).symbol}</b>`;
+        const b = `<b>${event.b.card.rank}${suitOf(event.b.card.suit).symbol}</b>`;
+        return `${name(event.player)} ${you(event.player) ? 'swap' : 'swaps'} ${a} and ${b} between boats.`;
+      }
       case 'cast': {
         const card = `<b>${event.card.rank}${suitOf(event.card.suit).symbol}</b>`;
         return `${name(event.player)} ${you(event.player) ? 'cast' : 'casts'} the ${card}.`;
@@ -184,13 +196,18 @@ export class CastView {
     const costs = game.rules.costs;
 
     if (game.phase === 'cast') {
-      if (this.callArmed) return `Tap a card to cast it and call its rank (${costs.call} luck).`;
-      if (this.swapArmed) return `Tap a card to swap it for a new one (${costs.redraw} luck).`;
+      if (this.callKind === 'rank') return `Tap a card to cast it and call its rank (${costs.call} luck).`;
+      if (this.callKind === 'suit') return `Tap a card to cast it and call its suit (${costs.call} luck).`;
+      if (this.swapArmed) {
+        return this.swapPick
+          ? 'Now tap a card in a different boat to swap with.'
+          : `Tap any boated card, then one in a different boat (${costs.boatSwap} luck).`;
+      }
       return 'Cast a card into the pond.';
     }
     if (game.phase === 'respond') {
       const forced = game.forcedCardsFor(game.human.index);
-      if (forced.length) return `<b>${rankPlural(game.calledRank)}</b> were called — you must answer with one.`;
+      if (forced.length) return `<b>${calledLabel(game.called)}</b> were called — you must answer with one.`;
       return 'Answer face down.';
     }
     if (game.phase === 'boat') {
@@ -212,6 +229,9 @@ export class CastView {
         ? (game.phase === 'cast' ? 'Your cast' : game.phase === 'boat' ? 'Your catch' : 'Your answer')
         : `${game.players[game.caster].name}’s cast`;
     this.el.pill.classList.toggle('mine', !game.isOver && game.current.isHuman);
+
+    this.swapActive = !game.isOver && game.current.isHuman
+      && game.phase === 'cast' && this.swapArmed && game.canSwapBoats;
 
     this.#renderRivals();
     this.#renderTable();
@@ -260,12 +280,22 @@ export class CastView {
 
   #renderBoat(container, player, large) {
     const size = this.game.rules.boatSize;
+    const swapping = this.swapActive;
     const frag = document.createDocumentFragment();
     for (let i = 0; i < size; i++) {
       const card = player.boat[i];
       if (card) {
-        const el = cardEl(card, large ? 'card boat-card' : 'card boat-card tiny');
+        const el = cardEl(card, large ? 'card boat-card' : 'card boat-card tiny', swapping);
         if (!container.dataset[`slot${i}`] || container.dataset[`slot${i}`] !== card.id) el.classList.add('landed');
+        if (swapping) {
+          const pick = this.swapPick;
+          const chosen = pick && pick.player === player.index && pick.index === i;
+          el.classList.add('swappable');
+          el.classList.toggle('picked', !!chosen);
+          // Once one card is held, only a different player's boat can complete it.
+          el.disabled = !!pick && !chosen && pick.player === player.index;
+          el.addEventListener('click', () => this.#onBoatCardTap(player.index, i));
+        }
         frag.append(el);
       } else {
         const slot = document.createElement('div');
@@ -315,7 +345,7 @@ export class CastView {
       wrap.append(el);
       const label = document.createElement('span');
       label.className = 'cast-label';
-      label.textContent = game.calledRank ? `calling ${rankPlural(game.calledRank)}` : 'cast';
+      label.textContent = game.called ? `calling ${calledLabel(game.called)}` : 'cast';
       wrap.append(label);
       this.el.slot.replaceChildren(wrap);
     } else {
@@ -382,18 +412,22 @@ export class CastView {
 
     if (!game.isOver && game.current.isHuman) {
       if (game.phase === 'cast') {
+        const arm = (kind) => {
+          this.callKind = this.callKind === kind ? null : kind;
+          this.swapArmed = false;
+          this.swapPick = null;
+          this.#render();
+          this.#setStatus(this.#promptText());
+        };
         if (you.luck >= costs.call) {
-          button(`Call a rank <i>${costs.call}</i>`, this.callArmed, () => {
-            this.callArmed = !this.callArmed;
-            this.swapArmed = false;
-            this.#render();
-            this.#setStatus(this.#promptText());
-          });
+          button(`Call rank <i>${costs.call}</i>`, this.callKind === 'rank', () => arm('rank'));
+          button(`Call suit <i>${costs.call}</i>`, this.callKind === 'suit', () => arm('suit'));
         }
-        if (you.luck >= costs.redraw) {
-          button(`Swap a card <i>${costs.redraw}</i>`, this.swapArmed, () => {
+        if (game.canSwapBoats) {
+          button(`Swap boats <i>${costs.boatSwap}</i>`, this.swapArmed, () => {
             this.swapArmed = !this.swapArmed;
-            this.callArmed = false;
+            this.callKind = null;
+            this.swapPick = null;
             this.#render();
             this.#setStatus(this.#promptText());
           });
@@ -468,15 +502,10 @@ export class CastView {
     this.#clearTimers();
 
     if (game.phase === 'cast') {
-      if (this.swapArmed) {
-        const result = game.redraw(cardId);
-        this.swapArmed = false;
-        if (result.ok) this.#present(game.drainEvents());
-        else this.#render();
-        return;
-      }
-      const call = this.callArmed;
-      this.callArmed = false;
+      const call = this.callKind;
+      this.callKind = null;
+      this.swapArmed = false;
+      this.swapPick = null;
       const result = game.cast(cardId, { call });
       if (!result.ok) { this.#render(); return; }
       this.#present(game.drainEvents());
@@ -488,6 +517,33 @@ export class CastView {
       if (!result.ok) { this.#render(); return; }
       this.#present(game.drainEvents());
     }
+  }
+
+  #onBoatCardTap(playerIndex, cardIndex) {
+    const game = this.game;
+    if (!this.swapActive) return;
+    const pick = this.swapPick;
+
+    if (!pick) {
+      this.swapPick = { player: playerIndex, index: cardIndex };
+      this.#render();
+      this.#setStatus(this.#promptText());
+      return;
+    }
+    if (pick.player === playerIndex) {
+      // Tapping your own pick again clears it; the same boat cannot swap itself.
+      this.swapPick = pick.index === cardIndex ? null : { player: playerIndex, index: cardIndex };
+      this.#render();
+      this.#setStatus(this.#promptText());
+      return;
+    }
+
+    this.#clearTimers();
+    const result = game.swapBoats(pick, { player: playerIndex, index: cardIndex });
+    this.swapArmed = false;
+    this.swapPick = null;
+    if (!result.ok) { this.#render(); this.#setStatus(this.#promptText()); return; }
+    this.#present(game.drainEvents());
   }
 
   #takeAnswer(index) {

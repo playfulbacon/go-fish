@@ -6,11 +6,13 @@
 export const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 
 export const SUITS = [
-  { id: 'S', symbol: '♠', color: 'black' },
-  { id: 'H', symbol: '♥', color: 'red' },
-  { id: 'D', symbol: '♦', color: 'red' },
-  { id: 'C', symbol: '♣', color: 'black' },
+  { id: 'S', symbol: '♠', color: 'black', name: 'Spades' },
+  { id: 'H', symbol: '♥', color: 'red', name: 'Hearts' },
+  { id: 'D', symbol: '♦', color: 'red', name: 'Diamonds' },
+  { id: 'C', symbol: '♣', color: 'black', name: 'Clubs' },
 ];
+
+export const suitName = (id) => (SUITS.find((s) => s.id === id) || {}).name || id;
 
 const PLURALS = {
   2: 'Twos', 3: 'Threes', 4: 'Fours', 5: 'Fives', 6: 'Sixes', 7: 'Sevens',

@@ -65,7 +65,7 @@ export class CastGame {
     this.round = 1;
     this.phase = 'cast';
     this.castCard = null;
-    this.calledRank = null;
+    this.called = null;   // { kind: 'rank' | 'suit', value }
     this.responses = [];
     this.respondQueue = [];
     this.boatsLeft = 0;
@@ -95,14 +95,34 @@ export class CastGame {
     return this.responses.filter((r) => !r.taken);
   }
 
-  /** A called rank forces anyone holding it to answer with it. */
+  /** A call forces anyone holding the named rank or suit to answer with it. */
   forcedCardsFor(playerIndex) {
-    if (!this.calledRank) return [];
-    return this.players[playerIndex].hand.filter((c) => c.rank === this.calledRank);
+    if (!this.called) return [];
+    const { kind, value } = this.called;
+    return this.players[playerIndex].hand.filter((c) => (kind === 'rank' ? c.rank : c.suit) === value);
   }
 
   canAfford(playerIndex, action) {
     return this.players[playerIndex].luck >= this.rules.costs[action];
+  }
+
+  /** Boated cards anyone could swap, as { player, index, card }. */
+  get swappableCards() {
+    const out = [];
+    for (const player of this.players) {
+      player.boat.forEach((card, index) => out.push({ player: player.index, index, card }));
+    }
+    return out;
+  }
+
+  /**
+   * A swap needs two boated cards belonging to different players. The caster
+   * need not own either of them -- breaking up two rivals is a legal play.
+   */
+  get canSwapBoats() {
+    if (this.phase !== 'cast' || !this.canAfford(this.caster, 'boatSwap')) return false;
+    const owners = new Set(this.players.filter((p) => p.boat.length > 0).map((p) => p.index));
+    return owners.size >= 2;
   }
 
   /** True while the caster may still pay for another card this turn. */
@@ -121,24 +141,28 @@ export class CastGame {
 
   // ------------------------------------------------------------------ moves
 
-  /** The caster plays `cardId` face up. With `call`, its rank is demanded. */
-  cast(cardId, { call = false } = {}) {
+  /**
+   * The caster plays `cardId` face up. `call` of 'rank' or 'suit' spends luck
+   * to demand that everyone holding it answers with it.
+   */
+  cast(cardId, { call = null } = {}) {
     if (this.phase !== 'cast') return { ok: false, error: 'not-casting' };
     const caster = this.players[this.caster];
     const card = caster.hand.find((c) => c.id === cardId);
     if (!card) return { ok: false, error: 'no-such-card' };
+    if (call && call !== 'rank' && call !== 'suit') return { ok: false, error: 'bad-call' };
     if (call && !this.canAfford(this.caster, 'call')) return { ok: false, error: 'not-enough-luck' };
 
     if (call) {
       caster.luck -= this.rules.costs.call;
-      this.calledRank = card.rank;
-      this.#emit({ type: 'call', player: caster.index, rank: card.rank });
+      this.called = { kind: call, value: call === 'rank' ? card.rank : card.suit };
+      this.#emit({ type: 'call', player: caster.index, ...this.called });
     }
 
     caster.hand = caster.hand.filter((c) => c.id !== cardId);
     this.castCard = card;
     this.responses = [];
-    this.#emit({ type: 'cast', player: caster.index, card, calledRank: this.calledRank });
+    this.#emit({ type: 'cast', player: caster.index, card, called: this.called });
 
     // Answer order does not matter -- every answer is face down until they are
     // all flipped -- so the player goes first and never sits waiting.
@@ -165,7 +189,7 @@ export class CastGame {
     if (!card) return { ok: false, error: 'no-such-card' };
 
     const forced = this.forcedCardsFor(playerIndex);
-    if (forced.length > 0 && card.rank !== this.calledRank) return { ok: false, error: 'must-answer-call' };
+    if (forced.length > 0 && !forced.some((c) => c.id === cardId)) return { ok: false, error: 'must-answer-call' };
 
     player.hand = player.hand.filter((c) => c.id !== cardId);
     this.responses.push({ player: playerIndex, card, taken: false, matched: false, forced: forced.length > 0 });
@@ -217,24 +241,32 @@ export class CastGame {
     return { ok: true };
   }
 
-  /** Pay luck to swap a card out of hand before casting. */
-  redraw(cardId) {
+  /**
+   * Pay luck to exchange two boated cards. The two must belong to different
+   * players; neither has to be the caster. Boat sizes are unchanged, so this
+   * can never complete a boat.
+   */
+  swapBoats(a, b) {
     if (this.phase !== 'cast') return { ok: false, error: 'not-casting' };
-    const caster = this.players[this.caster];
-    if (!this.canAfford(this.caster, 'redraw')) return { ok: false, error: 'not-enough-luck' };
-    const card = caster.hand.find((c) => c.id === cardId);
-    if (!card) return { ok: false, error: 'no-such-card' };
+    if (!this.canAfford(this.caster, 'boatSwap')) return { ok: false, error: 'not-enough-luck' };
+    if (!a || !b || a.player === b.player) return { ok: false, error: 'same-boat' };
 
-    caster.luck -= this.rules.costs.redraw;
-    caster.hand = caster.hand.filter((c) => c.id !== cardId);
-    this.discard.push(card);
-    const replacement = this.#drawCard();
-    if (replacement) {
-      caster.hand.push(replacement);
-      sortHand(caster.hand);
-    }
-    this.#emit({ type: 'redraw', player: caster.index, discarded: card, drawn: replacement });
-    return { ok: true, card: replacement };
+    const from = this.players[a.player];
+    const to = this.players[b.player];
+    const cardA = from?.boat[a.index];
+    const cardB = to?.boat[b.index];
+    if (!cardA || !cardB) return { ok: false, error: 'no-such-card' };
+
+    this.players[this.caster].luck -= this.rules.costs.boatSwap;
+    from.boat[a.index] = cardB;
+    to.boat[b.index] = cardA;
+    this.#emit({
+      type: 'boat-swap',
+      player: this.caster,
+      a: { player: from.index, card: cardA },
+      b: { player: to.index, card: cardB },
+    });
+    return { ok: true };
   }
 
   // ----------------------------------------------------------------- private
@@ -314,7 +346,7 @@ export class CastGame {
     if (spent.length) this.#emit({ type: 'discard', cards: spent });
 
     this.castCard = null;
-    this.calledRank = null;
+    this.called = null;
     this.responses = [];
     this.boatsLeft = 0;
 
